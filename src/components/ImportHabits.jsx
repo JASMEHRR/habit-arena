@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Sparkles, ClipboardCopy, Check, Wand2 } from 'lucide-react'
-import { addHabit } from '../lib/rooms.js'
+import { addHabit, CUSTOM_POINT_BUDGET } from '../lib/rooms.js'
 import { parseHabitsImport, IMPORT_PROMPT } from '../lib/importHabits.js'
 import { iconComponent } from '../icons.js'
 
@@ -9,7 +9,12 @@ export default function ImportHabits({ player, onChanged }) {
   const [text, setText] = useState('')
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const { habits, errors } = text.trim() ? parseHabitsImport(text) : { habits: [], errors: [] }
+
+  const customUsed = player.habits.filter((h) => !h.is_mandatory).reduce((s, h) => s + h.points, 0)
+  const remaining = Math.max(0, CUSTOM_POINT_BUDGET - customUsed)
+  const importTotal = habits.reduce((s, h) => s + (h.points || 0), 0)
 
   function copyPrompt() {
     navigator.clipboard?.writeText(IMPORT_PROMPT).then(() => {
@@ -19,6 +24,11 @@ export default function ImportHabits({ player, onChanged }) {
 
   async function addAll() {
     if (!habits.length) return
+    if (importTotal > remaining) {
+      setError(`These habits total ${importTotal} pts but you only have ${remaining} left in your custom budget.`)
+      return
+    }
+    setError('')
     setBusy(true)
     try {
       for (const h of habits) await addHabit(player.id, h)
@@ -69,6 +79,7 @@ export default function ImportHabits({ player, onChanged }) {
           <button onClick={addAll} disabled={busy}>
             <Wand2 size={15} /> {busy ? 'Adding…' : `Add ${habits.length} habit${habits.length > 1 ? 's' : ''}`}
           </button>
+          {error && <p className="errline">{error}</p>}
         </>
       )}
     </div>

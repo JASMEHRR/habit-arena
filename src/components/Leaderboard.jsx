@@ -1,9 +1,14 @@
-import { Flame } from 'lucide-react'
-import { weekScore, streak } from '../stats.js'
+import { useState } from 'react'
+import { Flame, ChevronDown, ChevronUp } from 'lucide-react'
+import { weekScore, streak, dayDone } from '../stats.js'
+import { iconComponent } from '../icons.js'
 
 // Group standings, ranked by weekly score. Highlights the current player.
 // `limit` caps how many rows render (used by the dashboard overview preview).
-export default function Leaderboard({ players, entriesByHabit, days, meId, limit }) {
+// Rows expand to show that player's actual habit list — full visibility, so
+// no one can pad their score with habits no one else can see or check.
+export default function Leaderboard({ players, entriesByHabit, days, today, meId, limit }) {
+  const [openId, setOpenId] = useState(null)
   const ranked = players
     .map((p) => ({
       p,
@@ -34,17 +39,49 @@ export default function Leaderboard({ players, entriesByHabit, days, meId, limit
       </div>
       {nudge && <p className="lb-nudge">{nudge}</p>}
       <ul className="lb-list">
-        {rows.map((r, i) => (
-          <li key={r.p.id} className={r.p.id === meId ? 'me' : ''}>
-            <span className={'lb-rank' + (i === 0 ? ' gold' : '')}>{i + 1}</span>
-            <span className="lb-avatar">{r.p.avatar}</span>
-            <span className="lb-name">{r.p.display_name}{r.p.id === meId && <em> (you)</em>}</span>
-            {r.streak > 0 && (
-              <span className="lb-streak"><Flame size={13} /> {r.streak}</span>
-            )}
-            <span className={'lb-score ' + (r.week < 0 ? 'neg' : 'pos')}>{r.week}</span>
-          </li>
-        ))}
+        {rows.map((r, i) => {
+          const open = openId === r.p.id
+          return (
+            <li key={r.p.id} className={(r.p.id === meId ? 'me' : '') + (open ? ' expanded' : '')}>
+              <button
+                className="lb-row-btn"
+                onClick={() => setOpenId(open ? null : r.p.id)}
+                aria-expanded={open}
+              >
+                <span className={'lb-rank' + (i === 0 ? ' gold' : '')}>{i + 1}</span>
+                <span className="lb-avatar">{r.p.avatar}</span>
+                <span className="lb-name">{r.p.display_name}{r.p.id === meId && <em> (you)</em>}</span>
+                {r.streak > 0 && (
+                  <span className="lb-streak"><Flame size={13} /> {r.streak}</span>
+                )}
+                <span className={'lb-score ' + (r.week < 0 ? 'neg' : 'pos')}>{r.week}</span>
+                {open ? <ChevronUp size={15} className="lb-chevron" /> : <ChevronDown size={15} className="lb-chevron" />}
+              </button>
+              {open && today && (
+                <ul className="lb-habits">
+                  {r.p.habits.length === 0 && <li className="muted small">No habits set up yet.</li>}
+                  {r.p.habits.map((h) => {
+                    const Icon = iconComponent(h.icon)
+                    const done = dayDone(entriesByHabit, h.id, today)
+                    const logged = entriesByHabit[h.id]?.[today] !== undefined
+                    const isBad = h.kind === 'bad'
+                    let status, mood
+                    if (!logged) { status = 'Not logged'; mood = 'neutral' }
+                    else if (isBad) { status = done ? 'Slipped' : 'Avoided'; mood = done ? 'bad' : 'good' }
+                    else { status = done ? 'Done' : 'Not done'; mood = done ? 'good' : 'neutral' }
+                    return (
+                      <li key={h.id}>
+                        <Icon size={14} />
+                        <span className="lb-habit-name">{h.label}{h.is_mandatory && ' 📌'}</span>
+                        <span className={'lb-habit-status ' + mood}>{status}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

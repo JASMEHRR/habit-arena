@@ -1,43 +1,37 @@
 // Data-access layer: everything that talks to Supabase lives here so the
 // React components stay small and readable.
+//
+// Identity is a real Supabase Auth session now (see AuthContext/lib/auth.js).
+// A "player" row is (room_id, user_id) — one per room per account — and its
+// display_name/avatar/email are a denormalized copy of the account's profile
+// (kept in sync by a DB trigger) so the rest of the app can keep reading
+// player.display_name etc without change.
 import { supabase } from '../supabaseClient.js'
 import { todayStr, lastNDays } from '../scoring.js'
 
 // How many days of entry history to load (for dot-strips, charts, streaks, bank).
 export const HISTORY_DAYS = 30
 
-// Remember which player this device is, per room, so a returning visitor
-// stays "logged in" without any password.
-const playerKey = (roomId) => `habit-arena:${roomId}`
-export function savedPlayerId(roomId) {
-  return localStorage.getItem(playerKey(roomId))
-}
-function rememberPlayer(roomId, playerId) {
-  localStorage.setItem(playerKey(roomId), playerId)
-}
+// Equal daily point budget: every player gets the same 3 mandatory habits
+// (skipping one costs you the points, not just 0), plus the same custom
+// budget for whatever else they add — so everyone's day maxes out at the
+// same total regardless of how many habits they personally set up.
+export const DAILY_POINT_TARGET = 30
+export const MANDATORY_HABITS = [
+  { label: 'Brush teeth', icon: 'brush', color: '#38bdf8', points: 5 },
+  { label: 'Drink water', icon: 'droplet', color: '#22d3ee', points: 5 },
+  { label: 'Sleep on time', icon: 'moon', color: '#a78bfa', points: 5 },
+]
+export const MANDATORY_POINTS_TOTAL = MANDATORY_HABITS.reduce((sum, h) => sum + h.points, 0)
+export const CUSTOM_POINT_BUDGET = DAILY_POINT_TARGET - MANDATORY_POINTS_TOTAL
 
-// Index of every room this device has joined, so the user can see & switch
-// between all their competitions. [{ roomId, code, name }] newest last.
-const ROOMS_KEY = 'habit-arena:rooms'
-export function savedRooms() {
-  try {
-    return JSON.parse(localStorage.getItem(ROOMS_KEY)) || []
-  } catch {
-    return []
+async function seedMandatoryHabits(playerId) {
+  for (const h of MANDATORY_HABITS) {
+    await addHabit(playerId, {
+      label: h.label, kind: 'good', points: h.points, icon: h.icon, color: h.color,
+      target: 1, is_mandatory: true, penalty_if_skipped: true,
+    })
   }
-}
-function rememberRoom(roomId, code, name) {
-  const rooms = savedRooms().filter((r) => r.roomId !== roomId)
-  rooms.push({ roomId, code, name })
-  localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms))
-}
-
-// Forget this device's membership in a room (the player row itself is left
-// intact — this only signs this browser out of it, matching the "log in"
-// behavior of savedPlayerId/rememberPlayer, which never touch the server).
-export function leaveRoom(roomId) {
-  localStorage.removeItem(playerKey(roomId))
-  localStorage.setItem(ROOMS_KEY, JSON.stringify(savedRooms().filter((r) => r.roomId !== roomId)))
 }
 
 // Short, human-friendly invite code (no confusing 0/O/1/I characters).
@@ -48,78 +42,134 @@ function makeInviteCode(len = 6) {
   return out
 }
 
-// Create a room and return its invite code. The creator joins on the room page.
-export async function createRoom() {
+// Create a room and immediately join its creator as a player. Returns the
+// invite code.
+export async function createRoom(userId, profile) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const invite_code = makeInviteCode()
     const { data, error } = await supabase
-      .from('rooms')
-      .insert({ invite_code })
-      .select()
-      .single()
-    if (!error) return data.invite_code
-    if (error.code !== '23505') throw error // 23505 = unique violation, retry
+      .from('rooms').insert({ invite_code, created_by: userId }).select().single()
+    if (error) {
+      if (error.code === '23505') continue // unique violation on invite_code, retry
+      throw error
+    }
+    await joinRoom(data.invite_code, userId, profile)
+    return data.invite_code
   }
   throw new Error('Could not generate a unique invite code, please try again.')
 }
 
+// Looks a room up by its invite code via a security-definer RPC (see
+// supabase/schema.sql get_room_by_code) — this has to work BEFORE you've
+// joined the room, so it can't depend on the "member rooms only" RLS policy.
 export async function getRoomByCode(code) {
-  const { data, error } = await supabase
-    .from('rooms')
-    .select('*')
-    .eq('invite_code', code)
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('get_room_by_code', { p_code: code }).maybeSingle()
   if (error) throw error
   return data // null if not found
 }
 
-// Join a room as a new player (unlimited players per room in V2).
-// If this device already belongs to the room, returns the existing player.
-// `email` is optional — attach it so this player can be found later via
-// findRoomsByEmail() from a different device/browser.
-export async function joinRoom(code, displayName, avatar = '🙂', email = '') {
+// Permanently delete a room (and, via cascade, its players/habits/entries/
+// messages). RLS restricts this to the room's creator.
+export async function deleteRoom(roomId) {
+  const { error } = await supabase.from('rooms').delete().eq('id', roomId)
+  if (error) throw error
+}
+
+// Join a room as the signed-in account (idempotent — returns the existing
+// player row if this account already belongs to the room).
+export async function joinRoom(code, userId, profile) {
   const room = await getRoomByCode(code)
   if (!room) throw new Error('Room not found. Check the invite link.')
 
-  const existingId = savedPlayerId(room.id)
-  if (existingId) {
-    const { data } = await supabase.from('players').select('*').eq('id', existingId).maybeSingle()
-    if (data) { rememberRoom(room.id, code, data.display_name); return data } // already a member
-  }
+  const { data: existing, error: exErr } = await supabase
+    .from('players').select('*').eq('room_id', room.id).eq('user_id', userId).maybeSingle()
+  if (exErr) throw exErr
+  if (existing) return existing
 
   const { data: player, error } = await supabase
     .from('players')
-    .insert({ room_id: room.id, display_name: displayName, avatar, email: email.trim() || null })
+    .insert({
+      room_id: room.id, user_id: userId,
+      display_name: profile.display_name, avatar: profile.avatar, email: profile.email,
+    })
     .select()
     .single()
   if (error) throw error
-  rememberPlayer(room.id, player.id)
-  rememberRoom(room.id, code, displayName)
+  await seedMandatoryHabits(player.id)
   return player
 }
 
-// Copy this device's habits from another of its rooms into the current player.
-// Returns how many habits were copied.
-export async function copyHabitsFrom(fromCode, toPlayerId) {
+// Every room this account belongs to, newest membership first.
+export async function listMyRooms(userId) {
+  const { data, error } = await supabase
+    .from('players')
+    .select('id, room_id, display_name, joined_at, rooms(invite_code, created_by)')
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: false })
+  if (error) throw error
+  return data
+    .filter((p) => p.rooms)
+    .map((p) => ({
+      playerId: p.id, roomId: p.room_id, code: p.rooms.invite_code, name: p.display_name,
+      isCreator: p.rooms.created_by === userId,
+    }))
+}
+
+// Re-link this account to pre-auth rooms it used to have via device-only
+// "login" (players.user_id was null before accounts existed). Matches by the
+// email that was optionally set on those old rows. Newly-claimed players get
+// the mandatory habits seeded too, since they never had them. Returns how
+// many rooms were recovered.
+export async function claimOldRooms(email) {
+  const { data, error } = await supabase.rpc('claim_orphaned_players', { p_email: email.trim() })
+  if (error) throw error
+  for (const row of data || []) await seedMandatoryHabits(row.player_id)
+  return (data || []).length
+}
+
+// Remove this account from a room (deletes the player row and, via cascade,
+// its habits/entries). Irreversible.
+export async function leaveRoom(playerId) {
+  const { error } = await supabase.from('players').delete().eq('id', playerId)
+  if (error) throw error
+}
+
+// Copy this account's CUSTOM habits from another of its rooms into the
+// current player (mandatory habits are never copied — the target player
+// already has their own, seeded on join). Skips any habit that would blow
+// the target's custom-point budget. Returns how many habits were copied.
+export async function copyHabitsFrom(fromCode, userId, toPlayerId) {
   const src = await getRoomByCode(fromCode)
   if (!src) throw new Error('That room no longer exists.')
-  const srcPlayerId = savedPlayerId(src.id)
-  if (!srcPlayerId) throw new Error('You are not a member of that room on this device.')
+  const { data: srcPlayer, error: spErr } = await supabase
+    .from('players').select('id').eq('room_id', src.id).eq('user_id', userId).maybeSingle()
+  if (spErr) throw spErr
+  if (!srcPlayer) throw new Error('You are not a member of that room.')
 
   const { data: habits, error } = await supabase
     .from('habits')
     .select('*')
-    .eq('player_id', srcPlayerId)
+    .eq('player_id', srcPlayer.id)
+    .eq('is_mandatory', false)
     .order('created_at', { ascending: true })
   if (error) throw error
 
+  const { data: existing, error: exErr } = await supabase
+    .from('habits').select('points, is_mandatory').eq('player_id', toPlayerId)
+  if (exErr) throw exErr
+  let used = existing.filter((h) => !h.is_mandatory).reduce((s, h) => s + h.points, 0)
+
+  let copied = 0
   for (const h of habits) {
+    if (used + h.points > CUSTOM_POINT_BUDGET) continue // would blow the budget, skip it
     await addHabit(toPlayerId, {
       label: h.label, kind: h.kind, points: h.points, bad_mode: h.bad_mode,
       icon: h.icon, color: h.color, target: h.target, unit: h.unit, is_bank: h.is_bank,
     })
+    used += h.points
+    copied++
   }
-  return habits.length
+  return copied
 }
 
 // Load the whole room: room + all players (each with habits), plus a window of
@@ -178,28 +228,6 @@ export async function loadRoomState(code, date = todayStr()) {
   return { room, players: playersFull, entriesByHabit, doneByHabit, days, date }
 }
 
-// Find every player row (across all rooms) attached to this email, along
-// with each room's invite code — used to restore access on a new device.
-export async function findRoomsByEmail(email) {
-  const clean = email.trim().toLowerCase()
-  if (!clean) return []
-  const { data: players, error } = await supabase
-    .from('players')
-    .select('*, rooms(invite_code)')
-    .ilike('email', clean)
-  if (error) throw error
-  return players
-    .filter((p) => p.rooms) // room might have been deleted
-    .map((p) => ({ playerId: p.id, roomId: p.room_id, code: p.rooms.invite_code, name: p.display_name }))
-}
-
-// Re-link this device to a room found via findRoomsByEmail, so it shows up
-// in "Your rooms" and the join screen recognizes this device as that player.
-export function restoreRoom({ roomId, code, playerId, name }) {
-  rememberPlayer(roomId, playerId)
-  rememberRoom(roomId, code, name)
-}
-
 export async function addHabit(playerId, habit) {
   const { error } = await supabase.from('habits').insert({
     player_id: playerId,
@@ -212,6 +240,8 @@ export async function addHabit(playerId, habit) {
     target: habit.target || 1,
     unit: habit.unit || '',
     is_bank: !!habit.is_bank,
+    is_mandatory: !!habit.is_mandatory,
+    penalty_if_skipped: !!habit.penalty_if_skipped,
   })
   if (error) throw error
 }
@@ -227,6 +257,13 @@ export async function setEntryValue(habitId, date, value, target = 1) {
   const { error } = await supabase
     .from('entries')
     .upsert({ habit_id: habitId, date, value: v, done: v >= target }, { onConflict: 'habit_id,date' })
+  if (error) throw error
+}
+
+// Delete a logged entry entirely (reverts to "not logged" for that day,
+// removing whatever points it contributed) — the ledger's undo action.
+export async function deleteEntry(habitId, date) {
+  const { error } = await supabase.from('entries').delete().eq('habit_id', habitId).eq('date', date)
   if (error) throw error
 }
 

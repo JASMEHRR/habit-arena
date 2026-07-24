@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import confetti from 'canvas-confetti'
-import { Users, Copy, Check, ChevronDown, Plus } from 'lucide-react'
+import { Users, Copy, Check, ChevronDown, Plus, LogOut } from 'lucide-react'
 import {
-  loadRoomState, joinRoom, subscribeRoom, savedPlayerId, setEntryValue, removeHabit, sendMessage,
-  savedRooms, createRoom, leaveRoom, updatePlayer,
+  loadRoomState, joinRoom, subscribeRoom, setEntryValue, removeHabit, deleteEntry, sendMessage,
+  listMyRooms, createRoom, leaveRoom, deleteRoom,
 } from '../lib/rooms.js'
+import { updateProfile, changePassword, signOut } from '../lib/auth.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { todayStr } from '../scoring.js'
 import {
   totalScore, weekScore, streak, dayCompletion, dayDone, playerBankDebt, levelFor, rankedIds, completionRate,
@@ -18,6 +20,7 @@ import ImportHabits from '../components/ImportHabits.jsx'
 import CopyHabits from '../components/CopyHabits.jsx'
 import Leaderboard from '../components/Leaderboard.jsx'
 import StatsPanel from '../components/StatsPanel.jsx'
+import PointsLedger from '../components/PointsLedger.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 
 const MOTIVATION = [
@@ -41,16 +44,15 @@ const NAV = [
 export default function Room() {
   const { code } = useParams()
   const navigate = useNavigate()
+  const { session, profile } = useAuth()
   const [state, setState] = useState(null)
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
-  const [name, setName] = useState('')
-  const [avatar, setAvatar] = useState(AVATARS[0])
-  const [email, setEmail] = useState('')
   const [joining, setJoining] = useState(false)
   const [startingNew, setStartingNew] = useState(false)
   const [copied, setCopied] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [myRooms, setMyRooms] = useState([])
   const [view, setView] = useState('dashboard')
 
   const reload = useCallback(async () => {
@@ -71,14 +73,17 @@ export default function Room() {
     return unsub
   }, [reload])
 
+  useEffect(() => {
+    listMyRooms(session.user.id).then(setMyRooms).catch(() => {})
+  }, [session.user.id, code])
+
   // Celebrate hitting 100%, streak milestones, and taking #1 (once each).
   const prevPctRef = useRef(null)
   const streakRef = useRef(null)
   const rankRef = useRef(null)
   useEffect(() => {
     if (!state) return
-    const mid = savedPlayerId(state.room.id)
-    const p = state.players.find((x) => x.id === mid)
+    const p = state.players.find((x) => x.user_id === session.user.id)
     if (!p || p.habits.length === 0) return
     const comp = dayCompletion(p.habits, state.entriesByHabit, state.date)
     const sv = streak(p.habits, state.entriesByHabit, state.days)
@@ -100,35 +105,32 @@ export default function Room() {
     prevPctRef.current = comp.pct
     streakRef.current = sv
     rankRef.current = rank
-  }, [state])
+  }, [state, session.user.id])
 
   if (status === 'loading') return <Centered>Loading…</Centered>
   if (status === 'notfound') return <Centered>Room not found. Check the invite link.</Centered>
   if (status === 'error') return <Centered>{error}</Centered>
 
   const { room, players, entriesByHabit, days, date } = state
-  const myId = savedPlayerId(room.id)
-  const me = players.find((p) => p.id === myId) || null
+  const me = players.find((p) => p.user_id === session.user.id) || null
 
-  // ---- join / login screen ----
+  // ---- not a member of this room yet: join with your existing profile ----
   if (!me) {
     async function join() {
-      if (!name.trim()) return
       setJoining(true); setError('')
       try {
-        await joinRoom(code, name.trim(), avatar, email)
+        await joinRoom(code, session.user.id, profile)
         await reload()
       } catch (e) { setError(e.message); setJoining(false) }
     }
     async function startNew() {
       setStartingNew(true); setError('')
       try {
-        const newCode = await createRoom()
+        const newCode = await createRoom(session.user.id, profile)
         navigate(`/room/${newCode}`)
       } catch (e) { setError(e.message); setStartingNew(false) }
     }
 
-    // Real per-room numbers (not marketing copy) — a brand-new room honestly shows 0s.
     const withHabits = players.filter((p) => p.habits.length > 0)
     const avgStreak = withHabits.length
       ? Math.round(withHabits.reduce((s, p) => s + streak(p.habits, entriesByHabit, days), 0) / withHabits.length)
@@ -153,19 +155,8 @@ export default function Room() {
         </div>
         <div className="login-right">
           <h2>Join the arena</h2>
-          <div className="sub">Pick an avatar and a name to jump in.</div>
-          <div className="avatar-grid avatar-pick">
-            {AVATARS.map((a) => (
-              <button key={a} type="button" className={'avatar-opt ava' + (a === avatar ? ' selected on' : '')} onClick={() => setAvatar(a)}>{a}</button>
-            ))}
-          </div>
-          <input className="field" placeholder="Your name" value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && join()} />
-          <input className="field" type="email" placeholder="Email (optional — lets you find your groups on other devices)"
-            value={email} onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && join()} />
-          <button className={'btn-primary' + (joining ? ' loading' : '')} onClick={join} disabled={joining || !name.trim()}>
+          <div className="sub">Join as {profile.avatar} {profile.display_name}.</div>
+          <button className={'btn-primary' + (joining ? ' loading' : '')} onClick={join} disabled={joining}>
             {joining ? 'Joining…' : 'Join competition →'}
           </button>
           <div className="divider">or</div>
@@ -200,10 +191,16 @@ export default function Room() {
   async function onRemove(habitId) {
     try { await removeHabit(habitId); reload() } catch (e) { setError(e.message) }
   }
+  async function onDeleteEntry(habitId, entryDate) {
+    try { await deleteEntry(habitId, entryDate); reload() } catch (e) { setError(e.message) }
+  }
   function onLeave() {
-    if (!window.confirm('Leave this room on this device? You can re-join with the invite link any time.')) return
-    leaveRoom(room.id)
-    navigate('/')
+    if (!window.confirm('Leave this room? Your habits and history in it will be deleted.')) return
+    leaveRoom(me.id).then(() => navigate('/')).catch((e) => setError(e.message))
+  }
+  function onDeleteRoom() {
+    if (!window.confirm('Delete this room for everyone? All members\' habits and history will be permanently deleted.')) return
+    deleteRoom(room.id).then(() => navigate('/')).catch((e) => setError(e.message))
   }
 
   const total = totalScore(me.habits, entriesByHabit, days)
@@ -232,6 +229,9 @@ export default function Room() {
         <div className="nav-group-label">General</div>
         <button className={'nav-item' + (view === 'settings' ? ' active' : '')} onClick={() => setView('settings')}>⚙️ Settings</button>
         <button className="nav-item" onClick={onLeave}>🚪 Leave room</button>
+        {room.created_by === session.user.id && (
+          <button className="nav-item" onClick={onDeleteRoom}>🗑️ Delete room</button>
+        )}
       </aside>
 
       <main className="dash-main">
@@ -255,7 +255,7 @@ export default function Room() {
           </button>
           {switcherOpen && (
             <div className="switcher-menu">
-              {savedRooms().map((r) => (
+              {myRooms.map((r) => (
                 <button key={r.roomId} className={'switcher-item' + (r.code === code ? ' current' : '')}
                   onClick={() => { setSwitcherOpen(false); if (r.code !== code) navigate(`/room/${r.code}`) }}>
                   {r.name ? `${r.name}'s room` : 'Room'} <code>{r.code}</code>
@@ -325,14 +325,19 @@ export default function Room() {
         )}
 
         {view === 'leaderboard' && (
-          <Leaderboard players={players} entriesByHabit={entriesByHabit} days={days} meId={me.id} />
+          <Leaderboard players={players} entriesByHabit={entriesByHabit} days={days} today={date} meId={me.id} />
         )}
 
         {view === 'chat' && <ChatPanel mode="inline" room={room} players={players} me={me} />}
 
-        {view === 'stats' && <StatsPanel habits={me.habits} entriesByHabit={entriesByHabit} days={days} />}
+        {view === 'stats' && (
+          <>
+            <StatsPanel habits={me.habits} entriesByHabit={entriesByHabit} days={days} />
+            <PointsLedger habits={me.habits} entriesByHabit={entriesByHabit} days={days} onDelete={onDeleteEntry} />
+          </>
+        )}
 
-        {view === 'settings' && <SettingsView me={me} onChanged={reload} />}
+        {view === 'settings' && <SettingsView onChanged={reload} />}
 
         {error && <p className="errline">{error}</p>}
         <footer>Room {code} · everyone updates live</footer>
@@ -402,17 +407,22 @@ function DashboardOverview({ me, players, entriesByHabit, days, total, week, str
       </div>
 
       <div className="grid-2">
-        <Leaderboard players={players} entriesByHabit={entriesByHabit} days={days} meId={me.id} limit={4} />
+        <Leaderboard players={players} entriesByHabit={entriesByHabit} days={days} today={days[days.length - 1]} meId={me.id} limit={4} />
         <ChatPanel mode="preview" room={room} players={players} me={me} />
       </div>
     </>
   )
 }
 
-function SettingsView({ me, onChanged }) {
-  const [name, setName] = useState(me.display_name)
-  const [avatar, setAvatar] = useState(me.avatar)
-  const [email, setEmail] = useState(me.email || '')
+// Global account settings: display name, avatar, email, password, sign out.
+// Editing here updates `profiles` and is synced into every room's player
+// row by a database trigger.
+function SettingsView({ onChanged }) {
+  const { session, profile, refreshProfile } = useAuth()
+  const [name, setName] = useState(profile.display_name)
+  const [avatar, setAvatar] = useState(profile.avatar)
+  const [email, setEmail] = useState(profile.email || '')
+  const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -421,7 +431,9 @@ function SettingsView({ me, onChanged }) {
     if (!name.trim()) return
     setSaving(true); setError(''); setSaved(false)
     try {
-      await updatePlayer(me.id, { display_name: name.trim(), avatar, email: email.trim() || null })
+      await updateProfile(session.user.id, { display_name: name.trim(), avatar, email: email.trim() || null })
+      if (newPassword) { await changePassword(newPassword); setNewPassword('') }
+      refreshProfile()
       await onChanged()
       setSaved(true); setTimeout(() => setSaved(false), 1500)
     } catch (e) { setError(e.message) } finally { setSaving(false) }
@@ -430,6 +442,7 @@ function SettingsView({ me, onChanged }) {
   return (
     <div className="card">
       <h2>Settings</h2>
+      <p className="muted small">Changes here apply to your account across every room.</p>
       <div className="avatar-pick">
         {AVATARS.map((a) => (
           <button key={a} className={'ava' + (a === avatar ? ' on' : '')} onClick={() => setAvatar(a)}>{a}</button>
@@ -438,12 +451,17 @@ function SettingsView({ me, onChanged }) {
       <div className="addrow">
         <input placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
-      <input className="email-opt" type="email" placeholder="Email (optional)" value={email}
+      <input className="email-opt" type="email" placeholder="Email" value={email}
         onChange={(e) => setEmail(e.target.value)} />
+      <input className="email-opt" type="password" placeholder="New password (leave blank to keep current)"
+        value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
       <button onClick={save} disabled={saving || !name.trim()} style={{ marginTop: 12 }}>
         {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save changes'}
       </button>
       {error && <p className="errline">{error}</p>}
+      <button className="ghost" onClick={signOut} style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <LogOut size={15} /> Sign out
+      </button>
     </div>
   )
 }

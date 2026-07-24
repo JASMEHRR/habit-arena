@@ -319,7 +319,9 @@ button.btn-outline:hover { filter: none; background: rgba(229, 9, 20, 0.08); box
 
 /* your-rooms list (landing) */
 .room-list { list-style: none; padding: 0; margin: 4px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.room-list li { display: flex; align-items: center; gap: 8px; }
 .room-list a {
+  flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm);
   background: rgba(10, 10, 12, 0.5); border: 1px solid var(--line-strong); color: var(--txt);
   text-decoration: none; transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
@@ -328,6 +330,8 @@ button.btn-outline:hover { filter: none; background: rgba(229, 9, 20, 0.08); box
 .room-name { flex: 1; font-weight: 600; }
 .room-list code { color: var(--amber); font-size: 13px; letter-spacing: 1px; }
 .room-go { color: var(--muted); }
+.room-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.room-actions button { padding: 8px; box-shadow: none; }
 
 /* group switcher */
 .switcher { position: relative; margin: 10px 0 -2px; }
@@ -449,6 +453,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
 }
 .hcard-remove { position: absolute; top: 8px; right: 8px; background: transparent; color: var(--muted); padding: 4px; box-shadow: none; opacity: 0; transition: opacity 0.2s; }
 .hcard:hover .hcard-remove { opacity: 0.7; }
+.hcard-mandatory { position: absolute; top: 8px; right: 8px; font-size: 13px; opacity: 0.6; }
 .hcard-main { display: flex; align-items: center; gap: 12px; }
 .hcard-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--habit) 35%, #0a0c16); color: #fff; flex-shrink: 0; }
 .hcard-text { flex: 1; min-width: 0; }
@@ -462,6 +467,13 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
 .tick.on { background: var(--habit); border-color: var(--habit); color: #fff; box-shadow: 0 0 18px -3px var(--habit); animation: pop 0.3s var(--ease); }
 .tick:active { transform: scale(0.9); }
 @keyframes pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+/* bad habits: two explicit buttons (avoided / slipped) instead of one tick,
+   so "avoided" always requires a tap and is never assumed from silence. */
+.bad-toggle { display: flex; gap: 6px; flex-shrink: 0; }
+.bad-toggle .tick { width: 38px; height: 38px; }
+.bad-toggle .tick.avoid.on { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 0 0 14px -3px var(--green); }
+.bad-toggle .tick.slip.on { background: var(--neg); border-color: var(--neg); color: #fff; box-shadow: 0 0 14px -3px var(--neg); }
 .counter { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .counter button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; background: rgba(255,255,255,0.08); box-shadow: none; }
 .counter .count { font-family: var(--font-display); font-size: 15px; min-width: 44px; text-align: center; }
@@ -479,7 +491,6 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
 .lb-nudge { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
 .lb-list { list-style: none; padding: 0; margin: 8px 0 0; }
 .lb-list li {
-  display: flex; align-items: center; gap: 12px; padding: 10px 0;
   border-bottom: 1px solid var(--line); position: relative; overflow: hidden;
 }
 .lb-list li:last-child { border-bottom: none; }
@@ -489,7 +500,11 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
   transform: rotate(45deg); transition: transform 0.8s ease; pointer-events: none;
 }
 .lb-list li:hover::before { transform: translate(50%,50%) rotate(45deg); }
-.lb-list li.me { background: rgba(229, 9, 20, 0.08); border-radius: 10px; padding: 10px 8px; }
+.lb-list li.me { background: rgba(229, 9, 20, 0.08); border-radius: 10px; }
+.lb-row-btn {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 8px;
+  background: transparent; border: none; box-shadow: none; color: inherit; text-align: left; position: relative; z-index: 1;
+}
 .lb-rank {
   width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; background: var(--card-solid);
   border: 1px solid var(--line-strong); display: flex; align-items: center; justify-content: center;
@@ -504,6 +519,15 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
 .lb-name em { color: var(--muted); font-weight: 400; font-style: normal; font-size: 12px; }
 .lb-streak { display: flex; align-items: center; gap: 3px; color: var(--red-soft); font-size: 12px; font-weight: 700; }
 .lb-score { font-family: var(--font-display); font-size: 17px; }
+.lb-chevron { color: var(--muted); flex-shrink: 0; }
+
+/* expanded per-player habit list — full visibility for the room */
+.lb-habits { list-style: none; margin: 0 0 10px; padding: 0 8px 0 60px; display: flex; flex-direction: column; gap: 6px; position: relative; z-index: 1; }
+.lb-habits li { border: none; padding: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--txt); }
+.lb-habit-name { flex: 1; }
+.lb-habit-status { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.lb-habit-status.good { color: var(--green); }
+.lb-habit-status.bad { color: var(--neg); }
 
 /* invite / roster */
 .roster { display: flex; align-items: center; gap: 6px; color: var(--muted); }
@@ -581,6 +605,18 @@ button.loading::after {
 .callout { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; border-radius: 10px; background: rgba(10, 10, 12, 0.4); }
 .callout.up { color: var(--green); } .callout.down { color: #ffb27a; }
 .callout b { color: var(--txt); }
+
+/* points ledger — chronological log of every logged entry, undoable */
+.ledger-list { list-style: none; padding: 0; margin: 12px 0 0; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.ledger-list li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; font-size: 13px; border-bottom: 1px solid var(--line); }
+.ledger-list li:last-child { border-bottom: none; }
+.ledger-date { color: var(--muted); font-size: 11.5px; font-family: ui-monospace, monospace; flex-shrink: 0; }
+.ledger-label { flex: 1; min-width: 0; }
+.ledger-pts { font-family: var(--font-display); font-size: 13px; color: var(--muted); }
+.ledger-pts.pos { color: var(--green); }
+.ledger-pts.neg { color: var(--neg); }
+.ledger-del { background: transparent; color: var(--muted); padding: 4px; box-shadow: none; flex-shrink: 0; }
+.ledger-del:hover { color: var(--red-soft); filter: none; }
 
 /* chat — inline (Room chat view) and preview (dashboard overview card) */
 .chat-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; max-height: 480px; }

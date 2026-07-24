@@ -18,9 +18,18 @@ export function doneMap(habits, entriesByHabit, date) {
   return m
 }
 
+// { habitId: logged } — whether an entry exists at all for that day. A habit
+// with no entry contributes 0 either way (see scoring.habitPoints) instead of
+// silently earning "avoided" credit for a bad habit no one ever logged.
+export function loggedMap(habits, entriesByHabit, date) {
+  const m = {}
+  for (const h of habits) m[h.id] = entriesByHabit[h.id]?.[date] !== undefined
+  return m
+}
+
 // Points earned on a single day.
 export function dayScore(habits, entriesByHabit, date) {
-  return playerScore(habits, doneMap(habits, entriesByHabit, date))
+  return playerScore(habits, doneMap(habits, entriesByHabit, date), loggedMap(habits, entriesByHabit, date))
 }
 
 // Today's ring: earned vs best-possible.

@@ -1,13 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Copy } from 'lucide-react'
-import { savedRooms, copyHabitsFrom } from '../lib/rooms.js'
+import { listMyRooms, copyHabitsFrom } from '../lib/rooms.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 // Reuse your habits from another room you're already in.
 export default function CopyHabits({ currentRoomId, player, onChanged }) {
-  const others = savedRooms().filter((r) => r.roomId !== currentRoomId)
-  const [from, setFrom] = useState(others[0]?.code || '')
+  const { session } = useAuth()
+  const [others, setOthers] = useState([])
+  const [from, setFrom] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    listMyRooms(session.user.id).then((rooms) => {
+      if (!alive) return
+      const rest = rooms.filter((r) => r.roomId !== currentRoomId)
+      setOthers(rest)
+      setFrom(rest[0]?.code || '')
+    })
+    return () => { alive = false }
+  }, [session.user.id, currentRoomId])
 
   if (others.length === 0) return null
 
@@ -15,8 +28,8 @@ export default function CopyHabits({ currentRoomId, player, onChanged }) {
     if (!from) return
     setBusy(true); setMsg('')
     try {
-      const n = await copyHabitsFrom(from, player.id)
-      setMsg(n ? `Copied ${n} habit${n > 1 ? 's' : ''}.` : 'That room has no habits yet.')
+      const n = await copyHabitsFrom(from, session.user.id, player.id)
+      setMsg(n ? `Copied ${n} habit${n > 1 ? 's' : ''}. (Mandatory habits and anything over your custom budget are skipped.)` : 'Nothing to copy — no custom habits there that fit your remaining budget.')
       onChanged()
     } catch (e) {
       setMsg(e.message)
@@ -31,7 +44,7 @@ export default function CopyHabits({ currentRoomId, player, onChanged }) {
       <p className="muted small">Bring the same habits into this group so you compete on the same goals.</p>
       <div className="addrow">
         <select value={from} onChange={(e) => setFrom(e.target.value)}>
-          {others.slice().reverse().map((r) => (
+          {others.map((r) => (
             <option key={r.roomId} value={r.code}>{r.name ? `${r.name}'s room` : 'Room'} · {r.code}</option>
           ))}
         </select>

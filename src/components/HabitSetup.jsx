@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { addHabit } from '../lib/rooms.js'
+import { addHabit, CUSTOM_POINT_BUDGET } from '../lib/rooms.js'
 import { iconKeyFor, iconComponent, ICON_CHOICES, HABIT_COLORS } from '../icons.js'
 
 // Built-in "daily necessities" — one-tap quick-adds (§3).
@@ -39,6 +39,13 @@ export default function HabitSetup({ player, onChanged }) {
   const [pickIcon, setPickIcon] = useState(false)
   const [pointsTouched, setPointsTouched] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  // Everyone gets the same 3 mandatory habits (seeded on join) plus this same
+  // custom budget — so no one can out-earn another player just by adding
+  // more/higher-value habits.
+  const customUsed = player.habits.filter((h) => !h.is_mandatory).reduce((s, h) => s + h.points, 0)
+  const remaining = Math.max(0, CUSTOM_POINT_BUDGET - customUsed)
 
   function updateLabel(v) {
     setLabel(v)
@@ -47,10 +54,16 @@ export default function HabitSetup({ player, onChanged }) {
   }
 
   async function add(habit) {
+    if (habit.points > remaining) {
+      setError(`Only ${remaining} custom pts left — lower this habit's points or remove another custom habit first.`)
+      return false
+    }
+    setError('')
     setBusy(true)
     try {
       await addHabit(player.id, habit)
       onChanged()
+      return true
     } finally {
       setBusy(false)
     }
@@ -59,11 +72,12 @@ export default function HabitSetup({ player, onChanged }) {
   async function addFromForm() {
     if (!label.trim()) return
     const is_bank = unit === 'hours' || unit === 'glasses'
-    await add({
+    const ok = await add({
       label: label.trim(), icon, color, kind,
       points: Number(points) || 0, bad_mode: badMode,
       target: Number(target) || 1, unit, is_bank,
     })
+    if (!ok) return
     setLabel(''); setIcon('check'); setPointsTouched(false)
     setPoints(suggestPoints('', kind)); setTarget(1); setUnit('')
   }
@@ -73,6 +87,9 @@ export default function HabitSetup({ player, onChanged }) {
   return (
     <div className="card setup">
       <h2>Add a habit</h2>
+      <p className="muted small">
+        Custom habit budget: {customUsed}/{CUSTOM_POINT_BUDGET} pts used — same for every player in this room.
+      </p>
       <div className="presets">
         {PRESETS.map((p) => {
           const PIcon = iconComponent(p.icon)
@@ -150,6 +167,7 @@ export default function HabitSetup({ player, onChanged }) {
         </label>
 
         <button onClick={addFromForm} disabled={busy || !label.trim()}>Add habit</button>
+        {error && <p className="errline">{error}</p>}
       </div>
     </div>
   )

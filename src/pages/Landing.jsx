@@ -1,60 +1,99 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Users, ArrowRight, Mail } from 'lucide-react'
-import { createRoom, savedRooms, findRoomsByEmail, restoreRoom } from '../lib/rooms.js'
+import { Users, ArrowRight, LogOut, Trash2, Mail } from 'lucide-react'
+import { createRoom, listMyRooms, leaveRoom, deleteRoom, claimOldRooms } from '../lib/rooms.js'
+import { signOut } from '../lib/auth.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 // The home screen: explain the game and let someone start a competition.
 export default function Landing() {
   const navigate = useNavigate()
-  const [rooms, setRooms] = useState(savedRooms())
+  const { session, profile } = useAuth()
+  const [rooms, setRooms] = useState([])
+  const [loadingRooms, setLoadingRooms] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const [findEmail, setFindEmail] = useState('')
-  const [finding, setFinding] = useState(false)
-  const [findMsg, setFindMsg] = useState('')
+  const [claimEmail, setClaimEmail] = useState('')
+  const [claiming, setClaiming] = useState(false)
+  const [claimMsg, setClaimMsg] = useState('')
 
-  async function findGroups() {
-    if (!findEmail.trim()) return
-    setFinding(true); setFindMsg('')
-    try {
-      const found = await findRoomsByEmail(findEmail)
-      if (!found.length) {
-        setFindMsg('No groups found for that email.')
-      } else {
-        found.forEach(restoreRoom)
-        setRooms(savedRooms())
-        setFindMsg(`Restored ${found.length} group${found.length > 1 ? 's' : ''} below.`)
-        setFindEmail('')
-      }
-    } catch (e) {
-      setFindMsg(e.message)
-    } finally {
-      setFinding(false)
-    }
+  function refreshRooms() {
+    return listMyRooms(session.user.id).then(setRooms).catch((e) => setError(e.message))
   }
+
+  useEffect(() => {
+    let alive = true
+    listMyRooms(session.user.id)
+      .then((r) => alive && setRooms(r))
+      .catch((e) => alive && setError(e.message))
+      .finally(() => alive && setLoadingRooms(false))
+    return () => { alive = false }
+  }, [session.user.id])
 
   async function start() {
     setBusy(true)
     setError('')
     try {
-      const code = await createRoom()
-      navigate(`/room/${code}`) // creator becomes player 1 on the room page
+      const code = await createRoom(session.user.id, profile)
+      navigate(`/room/${code}`)
     } catch (e) {
-      setError(e.message || 'Something went wrong. Is your .env set up?')
+      setError(e.message || 'Something went wrong.')
       setBusy(false)
     }
   }
 
+  async function claim() {
+    if (!claimEmail.trim()) return
+    setClaiming(true); setClaimMsg('')
+    try {
+      const n = await claimOldRooms(claimEmail)
+      if (n > 0) {
+        setClaimMsg(`Recovered ${n} room${n > 1 ? 's' : ''} — check "Your rooms" below.`)
+        setClaimEmail('')
+        await refreshRooms()
+      } else {
+        setClaimMsg('No rooms found with that email attached.')
+      }
+    } catch (e) {
+      setClaimMsg(e.message)
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  async function onLeave(e, r) {
+    e.preventDefault()
+    if (!window.confirm(`Leave ${r.name ? `${r.name}'s room` : 'this room'}? Your habits and history in it will be deleted.`)) return
+    try {
+      await leaveRoom(r.playerId)
+      setRooms((rs) => rs.filter((x) => x.roomId !== r.roomId))
+    } catch (e) { setError(e.message) }
+  }
+
+  async function onDelete(e, r) {
+    e.preventDefault()
+    if (!window.confirm(`Delete ${r.name ? `${r.name}'s room` : 'this room'} for everyone? This cannot be undone.`)) return
+    try {
+      await deleteRoom(r.roomId)
+      setRooms((rs) => rs.filter((x) => x.roomId !== r.roomId))
+    } catch (e) { setError(e.message) }
+  }
+
   return (
     <div className="wrap">
-      <header>
-        <h1>🏆 Habit Arena</h1>
-        <p className="sub">
-          Compete with your friends on your daily habits. Everyone sets up their
-          own habits, ticks them off each day, and climbs a live group
-          leaderboard — with streaks, stats, and trash talk.
-        </p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1>🏆 Habit Arena</h1>
+          <p className="sub">
+            Compete with your friends on your daily habits. Everyone sets up their
+            own habits, ticks them off each day, and climbs a live group
+            leaderboard — with streaks, stats, and trash talk.
+          </p>
+        </div>
+        <button className="ghost" onClick={signOut} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <LogOut size={15} /> Sign out
+        </button>
       </header>
 
       <div className="card center">
@@ -69,24 +108,24 @@ export default function Landing() {
       </div>
 
       <div className="card">
-        <div className="import-head"><Mail size={16} className="i-amber" /><b>On a new device?</b></div>
+        <div className="import-head"><Mail size={16} className="i-amber" /><b>Had a room before accounts existed?</b></div>
         <p className="muted small">
-          If you joined a group with your email, find it here — no password needed.
+          If an old room had your email attached, enter it here to re-link it to this account.
         </p>
         <div className="addrow">
-          <input type="email" placeholder="your@email.com" value={findEmail}
-            onChange={(e) => setFindEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && findGroups()} />
-          <button onClick={findGroups} disabled={finding}>{finding ? 'Searching…' : 'Find my groups'}</button>
+          <input type="email" placeholder="your@email.com" value={claimEmail}
+            onChange={(e) => setClaimEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && claim()} />
+          <button onClick={claim} disabled={claiming}>{claiming ? 'Checking…' : 'Recover rooms'}</button>
         </div>
-        {findMsg && <p className="muted small" style={{ marginTop: 8 }}>{findMsg}</p>}
+        {claimMsg && <p className="muted small" style={{ marginTop: 8 }}>{claimMsg}</p>}
       </div>
 
-      {rooms.length > 0 && (
+      {!loadingRooms && rooms.length > 0 && (
         <div className="card">
           <h2>Your rooms</h2>
           <ul className="room-list">
-            {rooms.slice().reverse().map((r) => (
+            {rooms.map((r) => (
               <li key={r.roomId}>
                 <Link to={`/room/${r.code}`}>
                   <Users size={16} />
@@ -94,6 +133,12 @@ export default function Landing() {
                   <code>{r.code}</code>
                   <ArrowRight size={16} className="room-go" />
                 </Link>
+                <span className="room-actions">
+                  <button className="ghost" title="Leave room" onClick={(e) => onLeave(e, r)}><LogOut size={14} /></button>
+                  {r.isCreator && (
+                    <button className="ghost" title="Delete room for everyone" onClick={(e) => onDelete(e, r)}><Trash2 size={14} /></button>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
