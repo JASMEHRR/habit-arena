@@ -2,15 +2,19 @@ import { habitPoints, dailyMax, playerScore, progressPercent } from '../scoring.
 
 // One player's column: progress bar at the top, then today's habit checkboxes.
 // `editable` is true only for the viewer's own column.
-export default function PlayerColumn({ player, doneByHabit, editable, onToggle }) {
+// `leading` is true when this player is currently ahead (adds a crown + glow).
+export default function PlayerColumn({ player, doneByHabit, editable, leading, onToggle }) {
   const earned = playerScore(player.habits, doneByHabit)
   const max = dailyMax(player.habits)
   const pct = progressPercent(earned, max)
 
   return (
-    <div className="card column">
+    <div className={'card column' + (leading ? ' leading' : '')}>
       <div className="col-head">
-        <h2>{player.display_name}</h2>
+        <h2>
+          {leading && <span className="crown" aria-label="leading" title="Leading">👑</span>}
+          {player.display_name}
+        </h2>
         <span className={'score ' + (earned < 0 ? 'neg' : 'pos')}>{earned}</span>
       </div>
 
@@ -47,7 +51,7 @@ export default function PlayerColumn({ player, doneByHabit, editable, onToggle }
                     </small>
                   </span>
                 </label>
-                <span className={pts < 0 ? 'minus' : pts > 0 ? 'plus' : 'muted'}>
+                <span className={'pts ' + (pts < 0 ? 'minus' : pts > 0 ? 'plus' : 'zero')}>
                   {pts > 0 ? `+${pts}` : pts}
                 </span>
               </li>

@@ -160,10 +160,29 @@ button.x { background: transparent; color: var(--muted); padding: 4px 8px; box-s
 .copy-link { white-space: nowrap; }
 
 /* ---- arena: side-by-side, stacked on mobile ---- */
-.arena { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.arena { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; position: relative; }
 @media (max-width: 720px) { .arena { grid-template-columns: 1fr; } }
 
+/* "VS" battle badge floating over the gap between the two columns. */
+.vs-badge {
+  position: absolute; left: 50%; top: 54px; transform: translate(-50%, -50%);
+  z-index: 3; width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 17px; color: #fff;
+  background: radial-gradient(circle at 30% 30%, #2a2f4d, #12152a);
+  border: 2px solid var(--amber);
+  box-shadow: 0 0 22px -4px rgba(245, 158, 11, 0.7), inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+@media (max-width: 720px) { .vs-badge { display: none; } }
+
 .column { position: relative; overflow: hidden; }
+/* the current leader gets an amber ring, glow, and crown */
+.column.leading {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.28), var(--shadow), 0 0 44px -12px rgba(245, 158, 11, 0.4);
+}
+.column.leading::before { background: linear-gradient(90deg, var(--amber), var(--amber-deep)); opacity: 1; }
+.crown { margin-right: 8px; font-size: 0.8em; filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.75)); }
 .column::before { /* top accent line */
   content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
   background: linear-gradient(90deg, var(--amber), var(--green));
@@ -209,14 +228,35 @@ button.x { background: transparent; color: var(--muted); padding: 4px 8px; box-s
 .habits li:hover { background: rgba(124, 108, 255, 0.06); }
 .habits li.checked { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); }
 .habits li label { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; }
+/* Custom checkbox — rounded box with a drawn checkmark and green glow. */
 .habits li input[type=checkbox] {
-  width: 22px; height: 22px; accent-color: var(--green); cursor: pointer; flex-shrink: 0;
+  appearance: none; -webkit-appearance: none;
+  width: 24px; height: 24px; flex-shrink: 0; cursor: pointer;
+  border-radius: 7px; border: 2px solid var(--line-strong);
+  background-color: rgba(9, 11, 22, 0.7);
+  background-repeat: no-repeat; background-position: center; background-size: 15px;
+  transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
+.habits li input[type=checkbox]:hover:not(:disabled) { border-color: var(--indigo); }
+.habits li input[type=checkbox]:checked {
+  border-color: var(--green);
+  background-color: var(--green);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.55);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+}
+.habits li input[type=checkbox]:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
 .habits li input:disabled { cursor: default; opacity: 0.6; }
 .hlabel { display: flex; flex-direction: column; gap: 2px; }
 .habits li.checked .hlabel { color: var(--green); }
-.plus { color: var(--green); font-weight: 700; font-family: var(--font-display); font-size: 15px; }
-.minus { color: var(--neg); font-weight: 700; font-family: var(--font-display); font-size: 15px; }
+
+/* point value as a pill badge */
+.pts {
+  flex-shrink: 0; font-family: var(--font-display); font-size: 13px;
+  padding: 5px 11px; border-radius: 20px; letter-spacing: 0.3px;
+}
+.pts.plus { color: var(--green); background: rgba(16, 185, 129, 0.15); }
+.pts.minus { color: var(--neg); background: rgba(255, 92, 120, 0.15); }
+.pts.zero { color: var(--muted); background: rgba(154, 160, 194, 0.1); }
 
 /* ---- habit setup ---- */
 .presets { display: flex; flex-wrap: wrap; gap: 9px; margin: 14px 0; }
@@ -247,6 +287,20 @@ button.x { background: transparent; color: var(--muted); padding: 4px 8px; box-s
 .more summary:hover { color: var(--indigo); }
 .more summary::before { content: '＋ '; }
 .more[open] summary::before { content: '－ '; }
+
+/* landing feature strip */
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 6px 0 4px; }
+@media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+.feature {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px 18px; backdrop-filter: blur(16px); display: flex; flex-direction: column; gap: 6px;
+}
+.feature b { font-size: 14px; }
+.feature span:not(.dot) { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-bottom: 4px; }
+.dot.amber { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+.dot.green { background: var(--green); box-shadow: 0 0 10px var(--green); }
+.dot.indigo { background: var(--indigo); box-shadow: 0 0 10px var(--indigo); }
 
 footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 30px; letter-spacing: 0.3px; }
 

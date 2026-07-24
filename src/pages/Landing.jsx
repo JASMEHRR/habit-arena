@@ -41,6 +41,24 @@ export default function Landing() {
         {error && <p className="errline">{error}</p>}
       </div>
 
+      <div className="features">
+        <div className="feature">
+          <span className="dot amber" />
+          <b>Set your own habits</b>
+          <span>Good habits earn points; bad ones cost you.</span>
+        </div>
+        <div className="feature">
+          <span className="dot green" />
+          <b>Head-to-head</b>
+          <span>Two live progress bars, one clear leader.</span>
+        </div>
+        <div className="feature">
+          <span className="dot indigo" />
+          <b>Updates instantly</b>
+          <span>Both screens sync the moment either of you ticks.</span>
+        </div>
+      </div>
+
       <footer>Two players · live scores · deploy free on Vercel</footer>
     </div>
   )

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   loadRoomState, joinRoom, subscribeRoom, savedPlayerId, setEntry,
 } from '../lib/rooms.js'
-import { todayStr } from '../scoring.js'
+import { todayStr, playerScore } from '../scoring.js'
 import HabitSetup from '../components/HabitSetup.jsx'
 import PlayerColumn from '../components/PlayerColumn.jsx'
 
@@ -111,6 +111,12 @@ export default function Room() {
   // Order columns so the viewer is on the left.
   const ordered = [me, ...players.filter((p) => p.id !== me.id)]
 
+  // Who's ahead right now? Crown the sole leader (no crown on a tie or 0-0).
+  const scored = ordered.map((p) => ({ id: p.id, score: playerScore(p.habits, doneByHabit) }))
+  const top = Math.max(...scored.map((s) => s.score))
+  const leaders = scored.filter((s) => s.score === top)
+  const leaderId = top > 0 && leaders.length === 1 ? leaders[0].id : null
+
   return (
     <div className="wrap wide">
       <header>
@@ -131,14 +137,17 @@ export default function Room() {
         <HabitSetup player={me} onChanged={reload} />
       ) : (
         <div className="arena">
-          {ordered.map((p) => (
-            <PlayerColumn
-              key={p.id}
-              player={p}
-              doneByHabit={doneByHabit}
-              editable={p.id === me.id}
-              onToggle={toggle}
-            />
+          {ordered.map((p, i) => (
+            <Fragment key={p.id}>
+              {i === 1 && <div className="vs-badge" aria-hidden="true">VS</div>}
+              <PlayerColumn
+                player={p}
+                doneByHabit={doneByHabit}
+                editable={p.id === me.id}
+                leading={leaderId === p.id}
+                onToggle={toggle}
+              />
+            </Fragment>
           ))}
         </div>
       )}
