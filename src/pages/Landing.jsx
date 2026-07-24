@@ -25,15 +25,16 @@ export default function Landing() {
       <header>
         <h1>🏆 Habit Arena</h1>
         <p className="sub">
-          Go head-to-head with a friend on your daily habits. Set up your own
-          habits, tick them off each day, and watch both scores update live.
+          Compete with your friends on your daily habits. Everyone sets up their
+          own habits, ticks them off each day, and climbs a live group
+          leaderboard — with streaks, stats, and trash talk.
         </p>
       </header>
 
       <div className="card center">
         <h2>Start a competition</h2>
         <p className="muted">
-          Creates a private room and an invite link you can send to one friend.
+          Creates a room and an invite link you can share with your whole crew.
         </p>
         <button onClick={start} disabled={busy}>
           {busy ? 'Creating…' : 'Start a competition'}
@@ -49,17 +50,17 @@ export default function Landing() {
         </div>
         <div className="feature">
           <span className="dot green" />
-          <b>Head-to-head</b>
-          <span>Two live progress bars, one clear leader.</span>
+          <b>Group leaderboard</b>
+          <span>Unlimited friends, ranked live with streaks and medals.</span>
         </div>
         <div className="feature">
           <span className="dot indigo" />
-          <b>Updates instantly</b>
-          <span>Both screens sync the moment either of you ticks.</span>
+          <b>Stats & chat</b>
+          <span>Rings, charts, a sleep bank, and a room chat to cheer or taunt.</span>
         </div>
       </div>
 
-      <footer>Two players · live scores · deploy free on Vercel</footer>
+      <footer>Group competition · live scores · deploy free on Vercel</footer>
     </div>
   )
 }
