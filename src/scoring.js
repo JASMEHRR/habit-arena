@@ -15,6 +15,18 @@ export function todayStr(d = new Date()) {
   return new Date(d.getTime() - tz).toISOString().slice(0, 10)
 }
 
+// Array of the last `n` date strings ending today (ascending, oldest first).
+export function lastNDays(n, endStr = todayStr()) {
+  const out = []
+  const end = new Date(endStr + 'T00:00:00')
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(end)
+    d.setDate(end.getDate() - i)
+    out.push(todayStr(d))
+  }
+  return out
+}
+
 // Points a single habit contributes given whether it was "done" today.
 export function habitPoints(habit, done) {
   const p = habit.points || 0

@@ -1,29 +1,45 @@
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import confetti from 'canvas-confetti'
+import { Users, Copy, Check } from 'lucide-react'
 import {
-  loadRoomState, joinRoom, subscribeRoom, savedPlayerId, setEntry,
+  loadRoomState, joinRoom, subscribeRoom, savedPlayerId, setEntryValue, removeHabit, sendMessage,
 } from '../lib/rooms.js'
-import { todayStr, playerScore } from '../scoring.js'
+import { todayStr } from '../scoring.js'
+import { totalScore, weekScore, streak, dayCompletion, playerBankDebt } from '../stats.js'
+import TopBar from '../components/TopBar.jsx'
+import ProgressRing from '../components/ProgressRing.jsx'
+import BankMeter from '../components/BankMeter.jsx'
+import HabitCard from '../components/HabitCard.jsx'
 import HabitSetup from '../components/HabitSetup.jsx'
-import PlayerColumn from '../components/PlayerColumn.jsx'
+import Leaderboard from '../components/Leaderboard.jsx'
+import StatsPanel from '../components/StatsPanel.jsx'
+import ChatPanel from '../components/ChatPanel.jsx'
+
+const MOTIVATION = [
+  'Small wins compound. Show up today.',
+  'Discipline beats motivation. Tick one off.',
+  'Your rival is training right now.',
+  "Don't break the chain.",
+  'Consistency is the real flex.',
+]
+
+const AVATARS = ['🦊', '🐼', '🐯', '🦁', '🐸', '🐵', '🦄', '🐙', '🐳', '🦩', '⚡', '🔥', '🌟', '🚀']
 
 export default function Room() {
   const { code } = useParams()
-  const [state, setState] = useState(null) // { room, players, doneByHabit, date }
-  const [status, setStatus] = useState('loading') // loading | notfound | ready | error
+  const [state, setState] = useState(null)
+  const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const [name, setName] = useState('')
+  const [avatar, setAvatar] = useState(AVATARS[0])
   const [joining, setJoining] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Reload the whole room from Supabase. Used on mount and on every realtime event.
   const reload = useCallback(async () => {
     try {
       const s = await loadRoomState(code, todayStr())
-      if (!s) {
-        setStatus('notfound')
-        return
-      }
+      if (!s) return setStatus('notfound')
       setState(s)
       setStatus('ready')
     } catch (e) {
@@ -34,50 +50,67 @@ export default function Room() {
 
   useEffect(() => {
     reload()
-    const unsub = subscribeRoom(reload) // live updates for both players
+    const unsub = subscribeRoom(reload)
     return unsub
   }, [reload])
+
+  // Celebrate hitting 100% for the day and streak milestones (once each).
+  const prevPctRef = useRef(null)
+  const streakRef = useRef(null)
+  useEffect(() => {
+    if (!state) return
+    const mid = savedPlayerId(state.room.id)
+    const p = state.players.find((x) => x.id === mid)
+    if (!p || p.habits.length === 0) return
+    const comp = dayCompletion(p.habits, state.entriesByHabit, state.date)
+    const sv = streak(p.habits, state.entriesByHabit, state.days)
+    const first = prevPctRef.current === null
+
+    if (!first && prevPctRef.current < 100 && comp.pct >= 100) {
+      confetti({ particleCount: 120, spread: 72, origin: { y: 0.35 } })
+      sendMessage(state.room.id, p.id, `${p.avatar} ${p.display_name} cleared their whole day! 🎯`, true).catch(() => {})
+    }
+    if (!first && sv > streakRef.current && sv % 7 === 0) {
+      sendMessage(state.room.id, p.id, `🔥 ${p.display_name} hit a ${sv}-day streak!`, true).catch(() => {})
+    }
+    prevPctRef.current = comp.pct
+    streakRef.current = sv
+  }, [state])
 
   if (status === 'loading') return <Centered>Loading…</Centered>
   if (status === 'notfound') return <Centered>Room not found. Check the invite link.</Centered>
   if (status === 'error') return <Centered>{error}</Centered>
 
-  const { room, players, doneByHabit } = state
+  const { room, players, entriesByHabit, days, date } = state
   const myId = savedPlayerId(room.id)
   const me = players.find((p) => p.id === myId) || null
 
-  // Not yet a member of this room on this device -> show the join prompt.
+  // ---- join screen ----
   if (!me) {
-    if (players.length >= 2) {
-      return <Centered>This room is full (2 players). Ask your friend to start a new one.</Centered>
-    }
     async function join() {
       if (!name.trim()) return
-      setJoining(true)
-      setError('')
+      setJoining(true); setError('')
       try {
-        await joinRoom(code, name.trim())
+        await joinRoom(code, name.trim(), avatar)
         await reload()
-      } catch (e) {
-        setError(e.message)
-        setJoining(false)
-      }
+      } catch (e) { setError(e.message); setJoining(false) }
     }
     return (
       <div className="wrap">
-        <header>
-          <h1>🏆 Habit Arena</h1>
-          <p className="sub">You've been invited to a habit competition. Enter your name to join.</p>
+        <header><h1>🏆 Habit Arena</h1>
+          <p className="sub">Join the competition — pick an avatar and a name.</p>
         </header>
         <div className="card center">
           <h2>Join the arena</h2>
+          <div className="avatar-pick">
+            {AVATARS.map((a) => (
+              <button key={a} className={'ava' + (a === avatar ? ' on' : '')} onClick={() => setAvatar(a)}>{a}</button>
+            ))}
+          </div>
           <div className="addrow">
-            <input
-              placeholder="Your name"
-              value={name}
+            <input placeholder="Your name" value={name}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && join()}
-            />
+              onKeyDown={(e) => e.key === 'Enter' && join()} />
             <button onClick={join} disabled={joining}>{joining ? 'Joining…' : 'Join'}</button>
           </div>
           {error && <p className="errline">{error}</p>}
@@ -86,88 +119,93 @@ export default function Room() {
     )
   }
 
-  // I'm a member. If I haven't set up any habits yet, show the setup form.
   const needsSetup = me.habits.length === 0
-
   const inviteUrl = `${window.location.origin}/room/${code}`
   function copyLink() {
     navigator.clipboard?.writeText(inviteUrl).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setCopied(true); setTimeout(() => setCopied(false), 1500)
     })
   }
 
-  async function toggle(habitId, done) {
-    // Optimistic update so the tick feels instant; realtime confirms it.
-    setState((s) => ({ ...s, doneByHabit: { ...s.doneByHabit, [habitId]: done } }))
+  // Optimistic update so ticks feel instant; realtime/reload confirms.
+  async function onSetValue(habitId, value, target) {
+    setState((s) => {
+      const eb = { ...s.entriesByHabit, [habitId]: { ...(s.entriesByHabit[habitId] || {}) } }
+      eb[habitId][s.date] = { value, done: value >= target }
+      return { ...s, entriesByHabit: eb }
+    })
     try {
-      await setEntry(habitId, state.date, done)
-    } catch (e) {
-      setError(e.message)
-      reload() // revert to server truth on failure
-    }
+      await setEntryValue(habitId, date, value, target)
+    } catch (e) { setError(e.message); reload() }
+  }
+  async function onRemove(habitId) {
+    try { await removeHabit(habitId); reload() } catch (e) { setError(e.message) }
   }
 
-  // Order columns so the viewer is on the left.
-  const ordered = [me, ...players.filter((p) => p.id !== me.id)]
-
-  // Who's ahead right now? Crown the sole leader (no crown on a tie or 0-0).
-  const scored = ordered.map((p) => ({ id: p.id, score: playerScore(p.habits, doneByHabit) }))
-  const top = Math.max(...scored.map((s) => s.score))
-  const leaders = scored.filter((s) => s.score === top)
-  const leaderId = top > 0 && leaders.length === 1 ? leaders[0].id : null
+  const total = totalScore(me.habits, entriesByHabit, days)
+  const week = weekScore(me.habits, entriesByHabit, days)
+  const streakVal = streak(me.habits, entriesByHabit, days)
+  const comp = dayCompletion(me.habits, entriesByHabit, date)
+  const debt = playerBankDebt(me.habits, entriesByHabit, days)
 
   return (
-    <div className="wrap wide">
-      <header>
-        <h1>🏆 Habit Arena</h1>
-        <div className="invite">
-          <span className="muted">Invite link:</span>
-          <code>{inviteUrl}</code>
-          <button className="copy-link" onClick={copyLink}>
-            {copied ? 'Copied ✓' : 'Copy invite link'}
-          </button>
+    <div className="wrap wide dash">
+      <TopBar player={me} total={total} week={week} streak={streakVal} />
+      <p className="motivation">“{MOTIVATION[new Date(date).getDate() % MOTIVATION.length]}”</p>
+
+      <div className="invite">
+        <span className="roster">
+          <Users size={16} />
+          {players.map((p) => <span key={p.id} className="roster-ava" title={p.display_name}>{p.avatar}</span>)}
+          <span className="muted small">{players.length} in room</span>
+        </span>
+        <button className="copy-link" onClick={copyLink}>
+          {copied ? <><Check size={15} /> Copied</> : <><Copy size={15} /> Invite friends</>}
+        </button>
+      </div>
+
+      <div className="dash-grid">
+        <div className="dash-main">
+          <div className="today-row">
+            <div className="card ring-card">
+              <ProgressRing pct={comp.pct} label={`${Math.round(comp.pct)}%`} sub="today" />
+              <div className="ring-side">
+                <h2>Today</h2>
+                <p className="muted">{comp.earned} / {comp.max} points earned</p>
+              </div>
+            </div>
+            <div className="card"><BankMeter debt={debt} unit="" /></div>
+          </div>
+
+          {needsSetup ? (
+            <HabitSetup player={me} onChanged={reload} />
+          ) : (
+            <>
+              <div className="hcards">
+                {me.habits.map((h) => (
+                  <HabitCard key={h.id} habit={h} entriesByHabit={entriesByHabit}
+                    days={days} today={date} onSetValue={onSetValue} onRemove={onRemove} />
+                ))}
+              </div>
+              <details className="more"><summary>Add another habit</summary>
+                <HabitSetup player={me} onChanged={reload} />
+              </details>
+              <StatsPanel habits={me.habits} entriesByHabit={entriesByHabit} days={days} />
+            </>
+          )}
         </div>
-        {players.length < 2 && (
-          <p className="sub">Waiting for player 2 to join with the link above…</p>
-        )}
-      </header>
 
-      {needsSetup ? (
-        <HabitSetup player={me} onChanged={reload} />
-      ) : (
-        <div className="arena">
-          {ordered.map((p, i) => (
-            <Fragment key={p.id}>
-              {i === 1 && <div className="vs-badge" aria-hidden="true">VS</div>}
-              <PlayerColumn
-                player={p}
-                doneByHabit={doneByHabit}
-                editable={p.id === me.id}
-                leading={leaderId === p.id}
-                onToggle={toggle}
-              />
-            </Fragment>
-          ))}
-        </div>
-      )}
+        <aside className="dash-side">
+          <Leaderboard players={players} entriesByHabit={entriesByHabit} days={days} meId={me.id} />
+        </aside>
+      </div>
 
-      {!needsSetup && (
-        <details className="more">
-          <summary>Add more habits</summary>
-          <HabitSetup player={me} onChanged={reload} />
-        </details>
-      )}
-
-      <footer>Room {code} · scores update live for both players</footer>
+      <ChatPanel room={room} players={players} me={me} />
+      <footer>Room {code} · everyone updates live</footer>
     </div>
   )
 }
 
 function Centered({ children }) {
-  return (
-    <div className="wrap">
-      <div className="card center">{children}</div>
-    </div>
-  )
+  return <div className="wrap"><div className="card center">{children}</div></div>
 }

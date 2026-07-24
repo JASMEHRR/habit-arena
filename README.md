@@ -1,13 +1,30 @@
 # 🏆 Habit Arena
 
-A **two-player competitive habit tracker**. You and one friend each set up your
-own daily habits (good habits earn points; bad habits can reward you for
-avoiding them or penalize you for doing them). One person starts a room and
-sends the other an invite link. Both of you see a **shared screen, side by
-side**, each with a progress bar at the top that updates **live** as either
-player ticks their habits.
+A **gamified group habit-competition app**. Invite unlimited friends to one
+room via a link; everyone sets up their own daily habits and competes on a live
+leaderboard. Good habits earn points; bad habits reward avoidance or penalize
+slips. A **Bank** tracks sleep/health debt, and a stats dashboard, streaks,
+progress rings, Loop-style habit cards, and a group chat keep it motivating.
 
 Built with Vite + React and a free [Supabase](https://supabase.com) backend.
+
+### Features
+- **Unlimited players per room**, live leaderboard with medals, avatars, and streaks.
+- **Preset daily-necessity habits** (sleep, water, brush, shower, exercise, no
+  doomscrolling, wake early, journal, read, meditate, tidy) — each with an icon.
+  Custom habits auto-get a matching icon; pick your own icon + color.
+- **Loop-style habit cards**: colored block, icon, description, `count/target`
+  with `+` for extra reps, a dot-history strip, tick animation + floating points.
+- **Top bar** with animated total points, weekly points, and 🔥 streak.
+- **Today ring**, weekly bar chart, completion donut, and 30-day heatmap.
+- **The Bank**: fall short of a target (e.g. sleep 8h) and it banks as debt;
+  exceed later to repay; unpaid debt costs weekly points.
+- **Group chat** with live messages, avatars, and auto system messages on
+  streaks / clearing your day. Confetti when you hit 100%.
+
+> **Upgrading from V1?** Re-run `supabase/schema.sql` in the Supabase SQL editor
+> — the V2 additions use `add column if not exists` / `create table if not
+> exists`, so it's safe to run over your existing database.
 
 ---
 

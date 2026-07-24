@@ -1,52 +1,49 @@
 import { useState } from 'react'
 import { addHabit } from '../lib/rooms.js'
+import { iconKeyFor, iconComponent, ICON_CHOICES, HABIT_COLORS } from '../icons.js'
 
-// Simple heuristic: suggest a point value from the habit label. The user can
-// always override it. Bad habits default to a slightly higher value because
-// avoiding them takes willpower.
-const SUGGESTIONS = [
-  { match: /exercise|workout|gym|run|walk/i, points: 5 },
-  { match: /wake|early|morning/i, points: 4 },
-  { match: /sleep|bed/i, points: 4 },
-  { match: /read|study|learn/i, points: 3 },
-  { match: /meditat|journal/i, points: 3 },
-  { match: /water|hydrat/i, points: 2 },
-  { match: /shower|bath|brush|floss/i, points: 2 },
-  { match: /junk|sugar|soda|fast food/i, points: 4 },
-  { match: /smoke|vape|alcohol|drink/i, points: 5 },
-  { match: /scroll|phone|social|screen/i, points: 3 },
+// Built-in "daily necessities" — one-tap quick-adds (§3).
+const PRESETS = [
+  { label: 'Sleep', icon: 'moon', kind: 'good', points: 4, target: 8, unit: 'hours', is_bank: true, color: '#7c6cff' },
+  { label: 'Brush teeth', icon: 'brush', kind: 'good', points: 2, target: 2, unit: '', color: '#06b6d4' },
+  { label: 'Shower', icon: 'shower', kind: 'good', points: 2, target: 1, color: '#3b82f6' },
+  { label: 'Drink water', icon: 'droplet', kind: 'good', points: 2, target: 8, unit: 'glasses', is_bank: true, color: '#06b6d4' },
+  { label: 'Exercise', icon: 'dumbbell', kind: 'good', points: 5, target: 1, color: '#ef4444' },
+  { label: 'Eat healthy', icon: 'salad', kind: 'good', points: 4, target: 1, color: '#22c55e' },
+  { label: 'No doomscrolling', icon: 'phone', kind: 'bad', bad_mode: 'reward_avoid', points: 3, color: '#f97316' },
+  { label: 'Wake up early', icon: 'sun', kind: 'good', points: 4, target: 1, color: '#f59e0b' },
+  { label: 'Journaling', icon: 'pen', kind: 'good', points: 3, target: 1, color: '#8b5cf6' },
+  { label: 'Read', icon: 'book-open', kind: 'good', points: 3, target: 1, color: '#ec4899' },
+  { label: 'Meditate', icon: 'flower', kind: 'good', points: 3, target: 1, color: '#10b981' },
+  { label: 'Tidy space', icon: 'broom', kind: 'good', points: 2, target: 1, color: '#3b82f6' },
+]
+
+const SUGGEST = [
+  [/exercise|workout|gym|run/i, 5], [/wake|early/i, 4], [/sleep/i, 4],
+  [/journal|read|study|meditat/i, 3], [/water|shower|brush|tidy/i, 2], [/junk|smoke|scroll/i, 4],
 ]
 function suggestPoints(label, kind) {
-  for (const s of SUGGESTIONS) if (s.match.test(label)) return s.points
-  return kind === 'bad' ? 4 : 3 // sensible defaults
+  for (const [re, p] of SUGGEST) if (re.test(label)) return p
+  return kind === 'bad' ? 4 : 3
 }
-
-// Quick-add presets both players are likely to share.
-const PRESETS = [
-  { label: 'Sleep 8h', kind: 'good' },
-  { label: 'Drink water', kind: 'good' },
-  { label: 'Shower', kind: 'good' },
-  { label: 'Exercise', kind: 'good' },
-  { label: 'No junk food', kind: 'bad', bad_mode: 'reward_avoid' },
-  { label: 'No doomscrolling', kind: 'bad', bad_mode: 'both' },
-]
 
 export default function HabitSetup({ player, onChanged }) {
   const [label, setLabel] = useState('')
+  const [icon, setIcon] = useState('check')
+  const [color, setColor] = useState(HABIT_COLORS[0])
   const [kind, setKind] = useState('good')
   const [badMode, setBadMode] = useState('reward_avoid')
   const [points, setPoints] = useState(3)
+  const [target, setTarget] = useState(1)
+  const [unit, setUnit] = useState('')
+  const [pickIcon, setPickIcon] = useState(false)
   const [pointsTouched, setPointsTouched] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  // Keep the suggested value in sync until the user edits it manually.
   function updateLabel(v) {
     setLabel(v)
+    setIcon(iconKeyFor(v))
     if (!pointsTouched) setPoints(suggestPoints(v, kind))
-  }
-  function updateKind(v) {
-    setKind(v)
-    if (!pointsTouched) setPoints(suggestPoints(label, v))
   }
 
   async function add(habit) {
@@ -61,101 +58,99 @@ export default function HabitSetup({ player, onChanged }) {
 
   async function addFromForm() {
     if (!label.trim()) return
-    await add({ label: label.trim(), kind, points: Number(points) || 0, bad_mode: badMode })
-    setLabel('')
-    setPointsTouched(false)
-    setPoints(suggestPoints('', kind))
+    const is_bank = unit === 'hours' || unit === 'glasses'
+    await add({
+      label: label.trim(), icon, color, kind,
+      points: Number(points) || 0, bad_mode: badMode,
+      target: Number(target) || 1, unit, is_bank,
+    })
+    setLabel(''); setIcon('check'); setPointsTouched(false)
+    setPoints(suggestPoints('', kind)); setTarget(1); setUnit('')
   }
 
-  return (
-    <div className="card">
-      <h2>Set up {player.display_name}'s habits</h2>
-      <p className="muted">
-        Add the habits you want to compete on. Good habits earn points when
-        done; bad habits can reward you for avoiding them.
-      </p>
+  const PickedIcon = iconComponent(icon)
 
+  return (
+    <div className="card setup">
+      <h2>Add a habit</h2>
       <div className="presets">
-        {PRESETS.map((p) => (
-          <button
-            key={p.label}
-            className="chip"
-            disabled={busy}
-            onClick={() =>
-              add({
-                label: p.label,
-                kind: p.kind,
-                points: suggestPoints(p.label, p.kind),
-                bad_mode: p.bad_mode || null,
-              })
-            }
-          >
-            + {p.label}
-          </button>
-        ))}
+        {PRESETS.map((p) => {
+          const PIcon = iconComponent(p.icon)
+          return (
+            <button key={p.label} className="chip" disabled={busy}
+              onClick={() => add({ ...p, target: p.target || 1, unit: p.unit || '', is_bank: !!p.is_bank })}>
+              <PIcon size={14} /> {p.label}
+            </button>
+          )
+        })}
       </div>
 
       <div className="setup-form">
-        <input
-          placeholder="Habit name (e.g. Exercise)"
-          value={label}
-          onChange={(e) => updateLabel(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addFromForm()}
-        />
-
-        <div className="row">
-          <label className="seg">
-            <input type="radio" checked={kind === 'good'} onChange={() => updateKind('good')} />
-            Good habit
-          </label>
-          <label className="seg">
-            <input type="radio" checked={kind === 'bad'} onChange={() => updateKind('bad')} />
-            Bad habit
-          </label>
+        <div className="label-row">
+          <button className="icon-btn" style={{ '--habit': color }} onClick={() => setPickIcon((s) => !s)} title="Pick icon">
+            <PickedIcon size={20} />
+          </button>
+          <input placeholder="Habit name (e.g. Read)" value={label}
+            onChange={(e) => updateLabel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addFromForm()} />
         </div>
 
-        {kind === 'bad' && (
-          <label className="field">
-            How it scores
+        {pickIcon && (
+          <div className="icon-picker">
+            {ICON_CHOICES.map((k) => {
+              const KI = iconComponent(k)
+              return (
+                <button key={k} className={'ipick' + (k === icon ? ' on' : '')}
+                  onClick={() => { setIcon(k); setPickIcon(false) }}>
+                  <KI size={18} />
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="swatches">
+          {HABIT_COLORS.map((c) => (
+            <button key={c} className={'swatch' + (c === color ? ' on' : '')}
+              style={{ background: c }} onClick={() => setColor(c)} aria-label={'color ' + c} />
+          ))}
+        </div>
+
+        <div className="row">
+          <label className="seg"><input type="radio" checked={kind === 'good'} onChange={() => setKind('good')} /> Good habit</label>
+          <label className="seg"><input type="radio" checked={kind === 'bad'} onChange={() => setKind('bad')} /> Bad habit</label>
+        </div>
+
+        {kind === 'bad' ? (
+          <label className="field">How it scores
             <select value={badMode} onChange={(e) => setBadMode(e.target.value)}>
               <option value="reward_avoid">Reward me for avoiding it</option>
               <option value="penalty_do">Penalize me if I do it</option>
-              <option value="both">Both (reward + penalty)</option>
+              <option value="both">Both</option>
             </select>
           </label>
+        ) : (
+          <div className="row">
+            <label className="field">Daily target
+              <input type="number" className="num" min="1" value={target} onChange={(e) => setTarget(e.target.value)} />
+            </label>
+            <label className="field">Unit <small>(optional)</small>
+              <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+                <option value="">reps</option>
+                <option value="hours">hours (bank)</option>
+                <option value="glasses">glasses (bank)</option>
+              </select>
+            </label>
+          </div>
         )}
 
-        <label className="field">
-          Points <small>(suggested, editable)</small>
-          <input
-            type="number"
-            className="num"
-            min="0"
-            value={points}
-            onChange={(e) => {
-              setPointsTouched(true)
-              setPoints(e.target.value)
-            }}
-          />
+        <label className="field">Points <small>(suggested, editable)</small>
+          <input type="number" className="num" min="0" value={points}
+            onChange={(e) => { setPointsTouched(true); setPoints(e.target.value) }} />
         </label>
 
-        <button onClick={addFromForm} disabled={busy || !label.trim()}>
-          Add habit
-        </button>
+        <button onClick={addFromForm} disabled={busy || !label.trim()}>Add habit</button>
       </div>
-
-      {player.habits.length > 0 && (
-        <ul className="setup-list">
-          {player.habits.map((h) => (
-            <li key={h.id}>
-              <span>{h.label}</span>
-              <span className="muted">
-                {h.kind === 'good' ? `good · +${h.points}` : `bad · ${h.bad_mode} · ${h.points}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   )
 }

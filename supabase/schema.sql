@@ -90,3 +90,44 @@ begin
   alter publication supabase_realtime add table entries;
 exception when duplicate_object then null;
 end $$;
+
+-- ===========================================================================
+-- V2 ADDITIONS (gamified group competition: avatars, targets, bank, chat).
+-- All statements are idempotent — safe to re-run over a V1 database.
+-- ===========================================================================
+
+-- Players: avatar emoji + cached streak (day count of consecutive full days).
+alter table players add column if not exists avatar text not null default '🙂';
+alter table players add column if not exists streak int not null default 0;
+
+-- Habits: an icon keyword, a color, a numeric target with unit, and whether
+-- the habit feeds the "Bank" (numeric health targets like sleep/water).
+alter table habits add column if not exists icon    text not null default 'check';
+alter table habits add column if not exists color   text not null default '#7c6cff';
+alter table habits add column if not exists target  int  not null default 1;   -- reps or units per day
+alter table habits add column if not exists unit    text not null default '';  -- '', 'hours', 'glasses'
+alter table habits add column if not exists is_bank boolean not null default false;
+
+-- Entries: `value` holds the logged amount (reps done, hours slept, glasses).
+-- `done` stays as a convenience flag (value >= target). Existing rows default 0.
+alter table entries add column if not exists value numeric not null default 0;
+
+-- Group chat, one row per message, scoped to a room.
+create table if not exists messages (
+  id         uuid primary key default gen_random_uuid(),
+  room_id    uuid not null references rooms(id) on delete cascade,
+  player_id  uuid references players(id) on delete set null, -- null = system message
+  body       text not null,
+  is_system  boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table messages enable row level security;
+drop policy if exists "anon full access" on messages;
+create policy "anon full access" on messages for all to anon using (true) with check (true);
+
+do $$
+begin
+  alter publication supabase_realtime add table messages;
+exception when duplicate_object then null;
+end $$;
