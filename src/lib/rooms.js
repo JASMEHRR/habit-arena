@@ -32,6 +32,14 @@ function rememberRoom(roomId, code, name) {
   localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms))
 }
 
+// Forget this device's membership in a room (the player row itself is left
+// intact — this only signs this browser out of it, matching the "log in"
+// behavior of savedPlayerId/rememberPlayer, which never touch the server).
+export function leaveRoom(roomId) {
+  localStorage.removeItem(playerKey(roomId))
+  localStorage.setItem(ROOMS_KEY, JSON.stringify(savedRooms().filter((r) => r.roomId !== roomId)))
+}
+
 // Short, human-friendly invite code (no confusing 0/O/1/I characters).
 function makeInviteCode(len = 6) {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'

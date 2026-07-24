@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { MessageCircle, Send, X } from 'lucide-react'
+import { Send } from 'lucide-react'
 import { loadMessages, sendMessage, subscribeMessages } from '../lib/rooms.js'
 
-// Room-scoped group chat. Side drawer on desktop, full-width sheet on mobile.
-export default function ChatPanel({ room, players, me }) {
-  const [open, setOpen] = useState(false)
+// Room-scoped group chat.
+// mode="inline" renders the full scrollable thread + composer (Room chat view).
+// mode="preview" renders the last few lines only, read-only (dashboard overview card).
+export default function ChatPanel({ room, players, me, mode = 'inline', previewCount = 3 }) {
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
-  const [unread, setUnread] = useState(0)
   const bottomRef = useRef(null)
   const byId = Object.fromEntries(players.map((p) => [p.id, p]))
 
@@ -21,18 +21,8 @@ export default function ChatPanel({ room, players, me }) {
   }, [room.id])
 
   useEffect(() => {
-    if (open) { setUnread(0); bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }
-  }, [messages, open])
-
-  // Count unread while the panel is closed.
-  useEffect(() => {
-    if (!open && messages.length) setUnread((u) => u + 0) // handled below on new msg
-  }, [open])
-  const lastLen = useRef(0)
-  useEffect(() => {
-    if (!open && messages.length > lastLen.current) setUnread(messages.length - lastLen.current)
-    if (open) lastLen.current = messages.length
-  }, [messages, open])
+    if (mode === 'inline') bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, mode])
 
   async function send() {
     const body = text.trim()
@@ -41,46 +31,50 @@ export default function ChatPanel({ room, players, me }) {
     try { await sendMessage(room.id, me.id, body) } catch { /* ignore */ }
   }
 
-  return (
-    <>
-      <button className="chat-fab" onClick={() => setOpen(true)}>
-        <MessageCircle size={22} />
-        {unread > 0 && <span className="chat-badge">{unread}</span>}
-      </button>
-
-      <div className={'chat-drawer' + (open ? ' open' : '')}>
-        <div className="chat-head">
-          <h2>Room chat</h2>
-          <button className="x" onClick={() => setOpen(false)}><X size={18} /></button>
-        </div>
-
-        <div className="chat-body">
-          {messages.length === 0 && <p className="muted small">No messages yet. Say hi 👋</p>}
-          {messages.map((m) => {
-            if (m.is_system) return <div key={m.id} className="chat-sys">{m.body}</div>
+  if (mode === 'preview') {
+    const recent = messages.filter((m) => !m.is_system).slice(-previewCount)
+    return (
+      <div className="card">
+        <h3>Room chat</h3>
+        <div className="chat-preview-lines">
+          {recent.length === 0 && <p className="muted">No messages yet.</p>}
+          {recent.map((m) => {
             const p = byId[m.player_id]
-            const mine = m.player_id === me.id
-            return (
-              <div key={m.id} className={'chat-msg' + (mine ? ' mine' : '')}>
-                <span className="chat-ava">{p?.avatar || '🙂'}</span>
-                <div className="chat-bubble">
-                  <span className="chat-meta">{p?.display_name || 'Someone'} · {time(m.created_at)}</span>
-                  <span className="chat-text">{m.body}</span>
-                </div>
-              </div>
-            )
+            return <div key={m.id}>{p?.avatar || '🙂'} <b>{p?.display_name || 'Someone'}:</b> {m.body}</div>
           })}
-          <div ref={bottomRef} />
-        </div>
-
-        <div className="chat-input">
-          <input placeholder="Message the group…" value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()} />
-          <button onClick={send}><Send size={16} /></button>
         </div>
       </div>
-    </>
+    )
+  }
+
+  return (
+    <div className="card">
+      <h3>Room chat</h3>
+      <div className="chat-body">
+        {messages.length === 0 && <p className="muted small">No messages yet. Say hi 👋</p>}
+        {messages.map((m) => {
+          if (m.is_system) return <div key={m.id} className="chat-sys">{m.body}</div>
+          const p = byId[m.player_id]
+          const mine = m.player_id === me.id
+          return (
+            <div key={m.id} className={'chat-msg' + (mine ? ' mine' : '')}>
+              <span className="chat-ava">{p?.avatar || '🙂'}</span>
+              <div className="chat-bubble">
+                <span className="chat-meta">{p?.display_name || 'Someone'} · {time(m.created_at)}</span>
+                <span className="chat-text">{m.body}</span>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} />
+      </div>
+      <div className="chat-input">
+        <input placeholder="Message the group…" value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()} />
+        <button onClick={send}><Send size={16} /></button>
+      </div>
+    </div>
   )
 }
 

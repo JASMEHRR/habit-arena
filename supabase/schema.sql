@@ -139,3 +139,7 @@ end $$;
 -- ===========================================================================
 alter table players add column if not exists email text;
 create index if not exists players_email_idx on players (lower(email));
+
+-- Force PostgREST to reload its schema cache so new columns are visible
+-- immediately, even when this file is run via the SQL Editor (not `db push`).
+notify pgrst, 'reload schema';
