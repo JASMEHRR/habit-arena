@@ -50,6 +50,18 @@ export async function updateProfile(userId, fields) {
   return data
 }
 
+// Sends the "reset your password" email. Supabase delivers a recovery link
+// that lands on /reset-password with a session already established, which is
+// why App.jsx routes that path ahead of the signed-in/signed-out gate.
+// `redirectTo` must be listed under Authentication → URL Configuration in the
+// Supabase dashboard, or the link bounces.
+export async function requestPasswordReset(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}/reset-password`,
+  })
+  if (error) throw error
+}
+
 export async function changePassword(newPassword) {
   const { error } = await supabase.auth.updateUser({ password: newPassword })
   if (error) throw error

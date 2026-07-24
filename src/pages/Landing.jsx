@@ -82,7 +82,7 @@ export default function Landing() {
 
   return (
     <div className="wrap">
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+      <header className="landing-head">
         <div>
           <h1>🏆 Habit Arena</h1>
           <p className="sub">
@@ -91,7 +91,7 @@ export default function Landing() {
             leaderboard — with streaks, stats, and trash talk.
           </p>
         </div>
-        <button className="ghost" onClick={signOut} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button className="ghost signout-btn" onClick={signOut}>
           <LogOut size={15} /> Sign out
         </button>
       </header>
@@ -118,8 +118,20 @@ export default function Landing() {
             onKeyDown={(e) => e.key === 'Enter' && claim()} />
           <button onClick={claim} disabled={claiming}>{claiming ? 'Checking…' : 'Recover rooms'}</button>
         </div>
-        {claimMsg && <p className="muted small" style={{ marginTop: 8 }}>{claimMsg}</p>}
+        {claimMsg && <p className="muted small stack-sm">{claimMsg}</p>}
       </div>
+
+      {/* The card renders even with no rooms, so a new account sees a
+          deliberate empty state instead of the section silently vanishing. */}
+      {!loadingRooms && rooms.length === 0 && (
+        <div className="card">
+          <h2>Your rooms</h2>
+          <div className="empty-state">
+            <b>No rooms yet</b>
+            Start a competition above, or open an invite link from a friend to join theirs.
+          </div>
+        </div>
+      )}
 
       {!loadingRooms && rooms.length > 0 && (
         <div className="card">

@@ -16,7 +16,7 @@ export default function ProgressRing({ pct = 0, size = 120, stroke = 12, label, 
           stroke="url(#ringGrad)" strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={circ} strokeDashoffset={offset}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.16,1,0.3,1)' }}
+          className="ring-value" /* sweep transition lives in styles.css */
         />
         <defs>
           <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">

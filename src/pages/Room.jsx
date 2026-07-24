@@ -455,11 +455,11 @@ function SettingsView({ onChanged }) {
         onChange={(e) => setEmail(e.target.value)} />
       <input className="email-opt" type="password" placeholder="New password (leave blank to keep current)"
         value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-      <button onClick={save} disabled={saving || !name.trim()} style={{ marginTop: 12 }}>
+      <button onClick={save} disabled={saving || !name.trim()} className="stack-md">
         {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save changes'}
       </button>
       {error && <p className="errline">{error}</p>}
-      <button className="ghost" onClick={signOut} style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button className="ghost signout-btn stack-md" onClick={signOut}>
         <LogOut size={15} /> Sign out
       </button>
     </div>

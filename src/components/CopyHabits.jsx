@@ -50,7 +50,7 @@ export default function CopyHabits({ currentRoomId, player, onChanged }) {
         </select>
         <button onClick={copy} disabled={busy}>{busy ? 'Copying…' : 'Copy habits'}</button>
       </div>
-      {msg && <p className="muted small" style={{ marginTop: 8 }}>{msg}</p>}
+      {msg && <p className="muted small stack-sm">{msg}</p>}
     </div>
   )
 }

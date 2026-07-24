@@ -21,7 +21,7 @@ export default function PointsLedger({ habits, entriesByHabit, days, onDelete })
     <div className="card">
       <h2>Points ledger</h2>
       <p className="muted small">Every logged entry, and why it counted. Remove one to undo it.</p>
-      {rows.length === 0 && <p className="muted small" style={{ marginTop: 10 }}>Nothing logged yet.</p>}
+      {rows.length === 0 && <p className="muted small stack-md">Nothing logged yet.</p>}
       <ul className="ledger-list">
         {rows.map((r) => {
           const Icon = iconComponent(r.habit.icon)
