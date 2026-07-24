@@ -119,5 +119,26 @@ export function historyDots(entriesByHabit, habitId, days, n = 20) {
   return days.slice(-n).map((d) => dayDone(entriesByHabit, habitId, d))
 }
 
+// XP level from lifetime points. Triangular curve: reaching level L needs a
+// cumulative 15·L·(L-1)/2 points, so each level costs 15·L more than the last.
+// Returns { level, into, span, pct } where into/span is progress to next level.
+export function levelFor(total) {
+  const t = Math.max(0, Math.floor(total || 0))
+  const cum = (L) => (15 * L * (L - 1)) / 2
+  let level = 1
+  while (cum(level + 1) <= t) level++
+  const into = t - cum(level)
+  const span = 15 * level
+  return { level, into, span, pct: span ? Math.min(100, (into / span) * 100) : 0 }
+}
+
+// Ranked player ids by weekly score (best first) — used for rank-change events.
+export function rankedIds(players, entriesByHabit, days) {
+  return players
+    .map((p) => ({ id: p.id, score: weekScore(p.habits, entriesByHabit, days) }))
+    .sort((a, b) => b.score - a.score)
+    .map((r) => r.id)
+}
+
 // Points a habit earns right now (for the floating "+N" on check).
 export { habitPoints }

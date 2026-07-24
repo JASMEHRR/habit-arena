@@ -315,9 +315,17 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
   padding: 16px 20px; margin-bottom: 16px; backdrop-filter: blur(16px); box-shadow: var(--shadow);
 }
 .me { display: flex; align-items: center; gap: 12px; }
-.me-avatar { font-size: 34px; line-height: 1; }
+.me-avatar { font-size: 34px; line-height: 1; position: relative; }
+.me-level {
+  position: absolute; bottom: -4px; right: -8px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 20px; background: linear-gradient(135deg, var(--amber), var(--amber-deep)); color: #12152a;
+  font-family: var(--font-display); font-size: 11px; display: grid; place-items: center;
+  border: 2px solid var(--bg-2); box-shadow: 0 0 10px -2px var(--amber);
+}
 .me-name { font-family: var(--font-display); font-size: 18px; }
 .me-sub { color: var(--muted); font-size: 12px; }
+.me-level-bar { width: 110px; height: 6px; border-radius: 6px; background: rgba(255,255,255,0.1); margin-top: 5px; overflow: hidden; }
+.me-level-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--amber), var(--green)); border-radius: 6px; transition: width 0.5s var(--ease); }
 .stat-pills { display: flex; gap: 10px; flex-wrap: wrap; }
 .stat-pill {
   display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-radius: 14px;
@@ -389,6 +397,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
 /* leaderboard */
 .leaderboard .lb-head { display: flex; justify-content: space-between; align-items: baseline; }
 .lb-you { color: var(--amber); font-size: 12px; font-weight: 600; }
+.lb-nudge { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
 .lb-list { list-style: none; padding: 0; margin: 8px 0 0; }
 .lb-list li { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 10px; }
 .lb-list li.me { background: rgba(124, 108, 255, 0.12); border: 1px solid var(--line); }

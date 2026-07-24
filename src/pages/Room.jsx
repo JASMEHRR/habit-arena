@@ -6,7 +6,7 @@ import {
   loadRoomState, joinRoom, subscribeRoom, savedPlayerId, setEntryValue, removeHabit, sendMessage,
 } from '../lib/rooms.js'
 import { todayStr } from '../scoring.js'
-import { totalScore, weekScore, streak, dayCompletion, playerBankDebt } from '../stats.js'
+import { totalScore, weekScore, streak, dayCompletion, playerBankDebt, levelFor, rankedIds } from '../stats.js'
 import TopBar from '../components/TopBar.jsx'
 import ProgressRing from '../components/ProgressRing.jsx'
 import BankMeter from '../components/BankMeter.jsx'
@@ -55,9 +55,10 @@ export default function Room() {
     return unsub
   }, [reload])
 
-  // Celebrate hitting 100% for the day and streak milestones (once each).
+  // Celebrate hitting 100%, streak milestones, and taking #1 (once each).
   const prevPctRef = useRef(null)
   const streakRef = useRef(null)
+  const rankRef = useRef(null)
   useEffect(() => {
     if (!state) return
     const mid = savedPlayerId(state.room.id)
@@ -65,6 +66,7 @@ export default function Room() {
     if (!p || p.habits.length === 0) return
     const comp = dayCompletion(p.habits, state.entriesByHabit, state.date)
     const sv = streak(p.habits, state.entriesByHabit, state.days)
+    const rank = rankedIds(state.players, state.entriesByHabit, state.days).indexOf(p.id) + 1
     const first = prevPctRef.current === null
 
     if (!first && prevPctRef.current < 100 && comp.pct >= 100) {
@@ -74,8 +76,14 @@ export default function Room() {
     if (!first && sv > streakRef.current && sv % 7 === 0) {
       sendMessage(state.room.id, p.id, `🔥 ${p.display_name} hit a ${sv}-day streak!`, true).catch(() => {})
     }
+    // Took over #1 from someone else.
+    if (!first && rank === 1 && rankRef.current > 1 && state.players.length > 1) {
+      confetti({ particleCount: 90, spread: 90, origin: { y: 0.4 }, colors: ['#f59e0b', '#10b981', '#7c6cff'] })
+      sendMessage(state.room.id, p.id, `👑 ${p.display_name} took the lead!`, true).catch(() => {})
+    }
     prevPctRef.current = comp.pct
     streakRef.current = sv
+    rankRef.current = rank
   }, [state])
 
   if (status === 'loading') return <Centered>Loading…</Centered>
@@ -146,12 +154,13 @@ export default function Room() {
   const total = totalScore(me.habits, entriesByHabit, days)
   const week = weekScore(me.habits, entriesByHabit, days)
   const streakVal = streak(me.habits, entriesByHabit, days)
+  const level = levelFor(total)
   const comp = dayCompletion(me.habits, entriesByHabit, date)
   const debt = playerBankDebt(me.habits, entriesByHabit, days)
 
   return (
     <div className="wrap wide dash">
-      <TopBar player={me} total={total} week={week} streak={streakVal} />
+      <TopBar player={me} total={total} week={week} streak={streakVal} level={level} />
       <p className="motivation">“{MOTIVATION[new Date(date).getDate() % MOTIVATION.length]}”</p>
 
       <div className="invite">
