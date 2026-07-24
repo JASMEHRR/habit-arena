@@ -16,6 +16,22 @@ function rememberPlayer(roomId, playerId) {
   localStorage.setItem(playerKey(roomId), playerId)
 }
 
+// Index of every room this device has joined, so the user can see & switch
+// between all their competitions. [{ roomId, code, name }] newest last.
+const ROOMS_KEY = 'habit-arena:rooms'
+export function savedRooms() {
+  try {
+    return JSON.parse(localStorage.getItem(ROOMS_KEY)) || []
+  } catch {
+    return []
+  }
+}
+function rememberRoom(roomId, code, name) {
+  const rooms = savedRooms().filter((r) => r.roomId !== roomId)
+  rooms.push({ roomId, code, name })
+  localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms))
+}
+
 // Short, human-friendly invite code (no confusing 0/O/1/I characters).
 function makeInviteCode(len = 6) {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -58,7 +74,7 @@ export async function joinRoom(code, displayName, avatar = '🙂') {
   const existingId = savedPlayerId(room.id)
   if (existingId) {
     const { data } = await supabase.from('players').select('*').eq('id', existingId).maybeSingle()
-    if (data) return data // already a member of this room on this device
+    if (data) { rememberRoom(room.id, code, data.display_name); return data } // already a member
   }
 
   const { data: player, error } = await supabase
@@ -68,7 +84,32 @@ export async function joinRoom(code, displayName, avatar = '🙂') {
     .single()
   if (error) throw error
   rememberPlayer(room.id, player.id)
+  rememberRoom(room.id, code, displayName)
   return player
+}
+
+// Copy this device's habits from another of its rooms into the current player.
+// Returns how many habits were copied.
+export async function copyHabitsFrom(fromCode, toPlayerId) {
+  const src = await getRoomByCode(fromCode)
+  if (!src) throw new Error('That room no longer exists.')
+  const srcPlayerId = savedPlayerId(src.id)
+  if (!srcPlayerId) throw new Error('You are not a member of that room on this device.')
+
+  const { data: habits, error } = await supabase
+    .from('habits')
+    .select('*')
+    .eq('player_id', srcPlayerId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+
+  for (const h of habits) {
+    await addHabit(toPlayerId, {
+      label: h.label, kind: h.kind, points: h.points, bad_mode: h.bad_mode,
+      icon: h.icon, color: h.color, target: h.target, unit: h.unit, is_bank: h.is_bank,
+    })
+  }
+  return habits.length
 }
 
 // Load the whole room: room + all players (each with habits), plus a window of

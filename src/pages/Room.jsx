@@ -13,6 +13,7 @@ import BankMeter from '../components/BankMeter.jsx'
 import HabitCard from '../components/HabitCard.jsx'
 import HabitSetup from '../components/HabitSetup.jsx'
 import ImportHabits from '../components/ImportHabits.jsx'
+import CopyHabits from '../components/CopyHabits.jsx'
 import Leaderboard from '../components/Leaderboard.jsx'
 import StatsPanel from '../components/StatsPanel.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
@@ -189,6 +190,7 @@ export default function Room() {
 
           {needsSetup ? (
             <>
+              <CopyHabits currentRoomId={room.id} player={me} onChanged={reload} />
               <div className="card"><ImportHabits player={me} onChanged={reload} /></div>
               <HabitSetup player={me} onChanged={reload} />
             </>
@@ -200,7 +202,8 @@ export default function Room() {
                     days={days} today={date} onSetValue={onSetValue} onRemove={onRemove} />
                 ))}
               </div>
-              <details className="more"><summary>Add habits (form or auto-import)</summary>
+              <details className="more"><summary>Add habits (form, import, or copy from another room)</summary>
+                <CopyHabits currentRoomId={room.id} player={me} onChanged={reload} />
                 <div className="card"><ImportHabits player={me} onChanged={reload} /></div>
                 <HabitSetup player={me} onChanged={reload} />
               </details>

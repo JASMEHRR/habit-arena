@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { createRoom } from '../lib/rooms.js'
+import { useNavigate, Link } from 'react-router-dom'
+import { Users, ArrowRight } from 'lucide-react'
+import { createRoom, savedRooms } from '../lib/rooms.js'
 
 // The home screen: explain the game and let someone start a competition.
 export default function Landing() {
   const navigate = useNavigate()
+  const rooms = savedRooms()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -41,6 +43,24 @@ export default function Landing() {
         </button>
         {error && <p className="errline">{error}</p>}
       </div>
+
+      {rooms.length > 0 && (
+        <div className="card">
+          <h2>Your rooms</h2>
+          <ul className="room-list">
+            {rooms.slice().reverse().map((r) => (
+              <li key={r.roomId}>
+                <Link to={`/room/${r.code}`}>
+                  <Users size={16} />
+                  <span className="room-name">{r.name ? `${r.name}'s room` : 'Room'}</span>
+                  <code>{r.code}</code>
+                  <ArrowRight size={16} className="room-go" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="features">
         <div className="feature">
