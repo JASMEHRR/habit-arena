@@ -48,12 +48,15 @@ export function streak(habits, entriesByHabit, days) {
   return s
 }
 
-// Daily values per bank habit (chronological) for bank.js.
+// Daily values per bank habit (chronological) for bank.js. Only days the
+// player actually LOGGED count — untracked days never bank phantom debt.
 function bankValues(habits, entriesByHabit, days) {
   const out = {}
   for (const h of habits) {
     if (!h.is_bank) continue
-    out[h.id] = days.map((d) => dayValue(entriesByHabit, h.id, d))
+    out[h.id] = days
+      .filter((d) => entriesByHabit[h.id]?.[d] !== undefined)
+      .map((d) => dayValue(entriesByHabit, h.id, d))
   }
   return out
 }
