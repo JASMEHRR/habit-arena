@@ -1,14 +1,38 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Users, ArrowRight } from 'lucide-react'
-import { createRoom, savedRooms } from '../lib/rooms.js'
+import { Users, ArrowRight, Mail } from 'lucide-react'
+import { createRoom, savedRooms, findRoomsByEmail, restoreRoom } from '../lib/rooms.js'
 
 // The home screen: explain the game and let someone start a competition.
 export default function Landing() {
   const navigate = useNavigate()
-  const rooms = savedRooms()
+  const [rooms, setRooms] = useState(savedRooms())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const [findEmail, setFindEmail] = useState('')
+  const [finding, setFinding] = useState(false)
+  const [findMsg, setFindMsg] = useState('')
+
+  async function findGroups() {
+    if (!findEmail.trim()) return
+    setFinding(true); setFindMsg('')
+    try {
+      const found = await findRoomsByEmail(findEmail)
+      if (!found.length) {
+        setFindMsg('No groups found for that email.')
+      } else {
+        found.forEach(restoreRoom)
+        setRooms(savedRooms())
+        setFindMsg(`Restored ${found.length} group${found.length > 1 ? 's' : ''} below.`)
+        setFindEmail('')
+      }
+    } catch (e) {
+      setFindMsg(e.message)
+    } finally {
+      setFinding(false)
+    }
+  }
 
   async function start() {
     setBusy(true)
@@ -42,6 +66,20 @@ export default function Landing() {
           {busy ? 'Creating…' : 'Start a competition'}
         </button>
         {error && <p className="errline">{error}</p>}
+      </div>
+
+      <div className="card">
+        <div className="import-head"><Mail size={16} className="i-amber" /><b>On a new device?</b></div>
+        <p className="muted small">
+          If you joined a group with your email, find it here — no password needed.
+        </p>
+        <div className="addrow">
+          <input type="email" placeholder="your@email.com" value={findEmail}
+            onChange={(e) => setFindEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && findGroups()} />
+          <button onClick={findGroups} disabled={finding}>{finding ? 'Searching…' : 'Find my groups'}</button>
+        </div>
+        {findMsg && <p className="muted small" style={{ marginTop: 8 }}>{findMsg}</p>}
       </div>
 
       {rooms.length > 0 && (

@@ -131,3 +131,11 @@ begin
   alter publication supabase_realtime add table messages;
 exception when duplicate_object then null;
 end $$;
+
+-- ===========================================================================
+-- V3: email-based cross-device recovery (still no passwords).
+-- A player can optionally attach an email so they can find their groups
+-- from a different device/browser later, by looking up players.email.
+-- ===========================================================================
+alter table players add column if not exists email text;
+create index if not exists players_email_idx on players (lower(email));

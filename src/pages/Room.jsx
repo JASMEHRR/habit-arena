@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import confetti from 'canvas-confetti'
-import { Users, Copy, Check } from 'lucide-react'
+import { Users, Copy, Check, ChevronDown, Plus } from 'lucide-react'
 import {
   loadRoomState, joinRoom, subscribeRoom, savedPlayerId, setEntryValue, removeHabit, sendMessage,
+  savedRooms,
 } from '../lib/rooms.js'
 import { todayStr } from '../scoring.js'
 import { totalScore, weekScore, streak, dayCompletion, playerBankDebt, levelFor, rankedIds } from '../stats.js'
@@ -30,13 +31,16 @@ const AVATARS = ['🦊', '🐼', '🐯', '🦁', '🐸', '🐵', '🦄', '🐙',
 
 export default function Room() {
   const { code } = useParams()
+  const navigate = useNavigate()
   const [state, setState] = useState(null)
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [avatar, setAvatar] = useState(AVATARS[0])
+  const [email, setEmail] = useState('')
   const [joining, setJoining] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   const reload = useCallback(async () => {
     try {
@@ -101,7 +105,7 @@ export default function Room() {
       if (!name.trim()) return
       setJoining(true); setError('')
       try {
-        await joinRoom(code, name.trim(), avatar)
+        await joinRoom(code, name.trim(), avatar, email)
         await reload()
       } catch (e) { setError(e.message); setJoining(false) }
     }
@@ -123,6 +127,9 @@ export default function Room() {
               onKeyDown={(e) => e.key === 'Enter' && join()} />
             <button onClick={join} disabled={joining}>{joining ? 'Joining…' : 'Join'}</button>
           </div>
+          <input className="email-opt" type="email" placeholder="Email (optional — lets you find your groups on other devices)"
+            value={email} onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && join()} />
           {error && <p className="errline">{error}</p>}
         </div>
       </div>
@@ -162,6 +169,24 @@ export default function Room() {
   return (
     <div className="wrap wide dash">
       <TopBar player={me} total={total} week={week} streak={streakVal} level={level} />
+
+      <div className="switcher">
+        <button className="switcher-btn" onClick={() => setSwitcherOpen((s) => !s)}>
+          <Users size={15} /> Switch group <ChevronDown size={14} />
+        </button>
+        {switcherOpen && (
+          <div className="switcher-menu">
+            {savedRooms().map((r) => (
+              <button key={r.roomId} className={'switcher-item' + (r.code === code ? ' current' : '')}
+                onClick={() => { setSwitcherOpen(false); if (r.code !== code) navigate(`/room/${r.code}`) }}>
+                {r.name ? `${r.name}'s room` : 'Room'} <code>{r.code}</code>
+              </button>
+            ))}
+            <Link to="/" className="switcher-item new"><Plus size={14} /> Start / join another</Link>
+          </div>
+        )}
+      </div>
+
       <p className="motivation">“{MOTIVATION[new Date(date).getDate() % MOTIVATION.length]}”</p>
 
       <div className="invite">

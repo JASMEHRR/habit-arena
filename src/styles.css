@@ -300,6 +300,32 @@ button.x { background: transparent; color: var(--muted); padding: 4px 8px; box-s
 .room-list code { color: var(--amber); font-size: 13px; letter-spacing: 1px; }
 .room-go { color: var(--muted); }
 
+/* group switcher */
+.switcher { position: relative; margin: 10px 0 -2px; }
+.switcher-btn {
+  display: flex; align-items: center; gap: 7px; background: rgba(9, 11, 22, 0.6);
+  border: 1px solid var(--line-strong); color: var(--txt); padding: 8px 14px;
+  border-radius: 20px; font-size: 13px; box-shadow: none;
+}
+.switcher-btn:hover { border-color: var(--indigo); filter: none; }
+.switcher-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 220px;
+  background: var(--card-solid); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 2px;
+}
+.switcher-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 10px; border-radius: 8px; background: transparent; color: var(--txt);
+  font-size: 13px; text-decoration: none; box-shadow: none; text-align: left;
+}
+.switcher-item:hover { background: rgba(124, 108, 255, 0.12); filter: none; }
+.switcher-item.current { color: var(--amber); font-weight: 600; }
+.switcher-item code { color: var(--muted); font-size: 11px; }
+.switcher-item.new { color: var(--indigo); justify-content: flex-start; }
+
+/* optional email on join */
+.email-opt { width: 100%; margin-top: 10px; font-size: 12.5px; }
+
 /* landing feature strip */
 .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 6px 0 4px; }
 @media (max-width: 640px) { .features { grid-template-columns: 1fr; } }

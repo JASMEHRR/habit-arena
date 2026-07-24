@@ -67,7 +67,9 @@ export async function getRoomByCode(code) {
 
 // Join a room as a new player (unlimited players per room in V2).
 // If this device already belongs to the room, returns the existing player.
-export async function joinRoom(code, displayName, avatar = '🙂') {
+// `email` is optional — attach it so this player can be found later via
+// findRoomsByEmail() from a different device/browser.
+export async function joinRoom(code, displayName, avatar = '🙂', email = '') {
   const room = await getRoomByCode(code)
   if (!room) throw new Error('Room not found. Check the invite link.')
 
@@ -79,7 +81,7 @@ export async function joinRoom(code, displayName, avatar = '🙂') {
 
   const { data: player, error } = await supabase
     .from('players')
-    .insert({ room_id: room.id, display_name: displayName, avatar })
+    .insert({ room_id: room.id, display_name: displayName, avatar, email: email.trim() || null })
     .select()
     .single()
   if (error) throw error
@@ -166,6 +168,28 @@ export async function loadRoomState(code, date = todayStr()) {
   }))
 
   return { room, players: playersFull, entriesByHabit, doneByHabit, days, date }
+}
+
+// Find every player row (across all rooms) attached to this email, along
+// with each room's invite code — used to restore access on a new device.
+export async function findRoomsByEmail(email) {
+  const clean = email.trim().toLowerCase()
+  if (!clean) return []
+  const { data: players, error } = await supabase
+    .from('players')
+    .select('*, rooms(invite_code)')
+    .ilike('email', clean)
+  if (error) throw error
+  return players
+    .filter((p) => p.rooms) // room might have been deleted
+    .map((p) => ({ playerId: p.id, roomId: p.room_id, code: p.rooms.invite_code, name: p.display_name }))
+}
+
+// Re-link this device to a room found via findRoomsByEmail, so it shows up
+// in "Your rooms" and the join screen recognizes this device as that player.
+export function restoreRoom({ roomId, code, playerId, name }) {
+  rememberPlayer(roomId, playerId)
+  rememberRoom(roomId, code, name)
 }
 
 export async function addHabit(playerId, habit) {
