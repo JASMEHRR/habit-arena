@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node src/scoring.test.js && node src/bank.test.js"
+    "test": "node src/scoring.test.js && node src/bank.test.js && node src/importHabits.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",

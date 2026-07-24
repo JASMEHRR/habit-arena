@@ -422,6 +422,21 @@ footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 3
 /* motivation line */
 .motivation { color: var(--amber); font-style: italic; margin: -6px 0 16px; font-size: 14px; }
 
+/* auto-import panel */
+.import-head { display: flex; align-items: center; gap: 8px; }
+.import-head b { font-family: var(--font-display); font-size: 15px; }
+.import-box {
+  width: 100%; margin: 10px 0; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px;
+  background: rgba(9, 11, 22, 0.7); border: 1px solid var(--line-strong); color: var(--txt);
+  border-radius: var(--radius-sm); padding: 11px 13px; outline: none;
+}
+.import-box:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(124, 108, 255, 0.25); }
+.import-preview { display: flex; flex-wrap: wrap; gap: 7px; margin: 6px 0 12px; }
+.import-chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; padding: 5px 10px; border-radius: 20px;
+  background: color-mix(in srgb, var(--habit) 22%, #12152a); border: 1px solid color-mix(in srgb, var(--habit) 45%, transparent);
+}
+
 /* stats panel */
 .stats-charts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin: 8px 0 16px; }
 @media (max-width: 480px) { .stats-charts { grid-template-columns: 1fr; } }

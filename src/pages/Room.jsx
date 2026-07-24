@@ -12,6 +12,7 @@ import ProgressRing from '../components/ProgressRing.jsx'
 import BankMeter from '../components/BankMeter.jsx'
 import HabitCard from '../components/HabitCard.jsx'
 import HabitSetup from '../components/HabitSetup.jsx'
+import ImportHabits from '../components/ImportHabits.jsx'
 import Leaderboard from '../components/Leaderboard.jsx'
 import StatsPanel from '../components/StatsPanel.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
@@ -178,7 +179,10 @@ export default function Room() {
           </div>
 
           {needsSetup ? (
-            <HabitSetup player={me} onChanged={reload} />
+            <>
+              <div className="card"><ImportHabits player={me} onChanged={reload} /></div>
+              <HabitSetup player={me} onChanged={reload} />
+            </>
           ) : (
             <>
               <div className="hcards">
@@ -187,7 +191,8 @@ export default function Room() {
                     days={days} today={date} onSetValue={onSetValue} onRemove={onRemove} />
                 ))}
               </div>
-              <details className="more"><summary>Add another habit</summary>
+              <details className="more"><summary>Add habits (form or auto-import)</summary>
+                <div className="card"><ImportHabits player={me} onChanged={reload} /></div>
                 <HabitSetup player={me} onChanged={reload} />
               </details>
               <StatsPanel habits={me.habits} entriesByHabit={entriesByHabit} days={days} />
