@@ -48,8 +48,8 @@ export function iconComponent(key) {
 // Ordered keys for the icon picker UI.
 export const ICON_CHOICES = Object.keys(ICONS)
 
-// A palette of accent colors for habit cards (user can pick).
-export const HABIT_COLORS = [
-  '#7c6cff', '#f59e0b', '#10b981', '#ef4444', '#06b6d4',
-  '#ec4899', '#8b5cf6', '#f97316', '#22c55e', '#3b82f6',
-]
+// A habit's colour is the colour of its plane in the portrait, so the choices
+// are the four planes of the design system and nothing else — the composition
+// only holds together because there are exactly four. Re-exported from
+// src/planes.js, which owns them.
+export { PLANE_COLORS as HABIT_COLORS } from './planes.js'

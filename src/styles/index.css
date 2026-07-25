@@ -1,0 +1,7 @@
+/* Habit Arena stylesheet. Order matters: tokens define the vocabulary, base
+   resets and grounds the document, primitives build the component atoms, app
+   composes them into the shell and screens. */
+@import './tokens.css';
+@import './base.css';
+@import './primitives.css';
+@import './app.css';

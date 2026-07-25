@@ -1,0 +1,816 @@
+/* Shell and screens.
+
+   Phone first, for real: the bottom tab bar is the primary navigation and the
+   desktop rail is the widening of it, not the other way round. The app it
+   replaced had a desktop sidebar that stacked on mobile and pushed the habits —
+   the entire point of the product — below the fold. */
+
+.shell {
+  --tabbar-h: 62px;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+/* ---- header ---- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule);
+}
+@supports not (backdrop-filter: blur(8px)) {
+  .topbar { background: var(--bg); }
+}
+
+/* The wordmark: the eye plane, then the name in tracked caps. The old app used
+   a 🏆 emoji, which rendered differently on every OS. */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.wordmark__mark {
+  width: 22px;
+  height: 22px;
+  background: var(--accent);
+  clip-path: path('M0 11 A11 11 0 0 0 22 11 Z');
+  flex-shrink: 0;
+}
+.wordmark__text {
+  font-size: var(--fs-caption);
+  font-weight: var(--wt-black);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+/* The header is one line, always. `.row` wraps by default, which on a 390px
+   phone pushed the account avatar onto a second row and doubled the header. */
+.topbar > .row { flex-wrap: nowrap; }
+/* The player strip is decorative (it is aria-hidden) and the first thing that
+   should go when space is tight. */
+.roster-strip { display: none; }
+@media (min-width: 640px) {
+  .roster-strip { display: flex; }
+}
+
+.topbar__ref {
+  font-size: var(--fs-caption);
+  font-weight: var(--wt-semi);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border-left: 1px solid var(--rule);
+  padding-left: var(--space-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- main ---- */
+.main {
+  width: 100%;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4);
+  padding-bottom: calc(var(--tabbar-h) + var(--space-7) + env(safe-area-inset-bottom, 0px));
+}
+.main--narrow { max-width: 660px; }
+
+.page-head { margin-bottom: var(--space-5); }
+.page-head__title {
+  font-size: var(--fs-2xl);
+  font-weight: var(--wt-black);
+  letter-spacing: var(--tracking-tight);
+}
+.page-head__sub { color: var(--ink-quiet); margin-top: var(--space-2); max-width: var(--measure); }
+
+/* ---- bottom tab bar (phone) ----
+   Four destinations only. Everything secondary lives in the header menu, which
+   is where a once-ever action like "copy the invite link" belongs. */
+.tabbar {
+  position: fixed;
+  z-index: 40;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  background: var(--surface);
+  border-top: 1px solid var(--rule-strong);
+}
+.tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: var(--tabbar-h);
+  padding: var(--space-1);
+  text-decoration: none;
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+  font-weight: var(--wt-semi);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* The active tab is marked by a plane arriving along its top edge, not by
+   colour alone. */
+.tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform var(--dur-2) var(--ease-plane);
+}
+.tab[aria-current='page'] { color: var(--ink); }
+.tab[aria-current='page']::before { transform: scaleX(1); }
+.tab__badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 20px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+  font-weight: var(--wt-bold);
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ---- desktop: the tab bar becomes a rail ---- */
+.rail { display: none; }
+
+@media (min-width: 1024px) {
+  .shell {
+    --tabbar-h: 0px;
+    grid-template-columns: 236px 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .topbar { grid-column: 1 / -1; }
+  .tabbar { display: none; }
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    position: sticky;
+    top: 61px;
+    align-self: start;
+    height: calc(100dvh - 61px);
+    padding: var(--space-5) var(--space-3);
+    border-right: 1px solid var(--rule);
+  }
+  .rail__group { margin-top: var(--space-5); }
+  .rail .tab {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    min-height: var(--tap);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--fs-base);
+    font-weight: var(--wt-medium);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .rail .tab::before {
+    top: 0;
+    bottom: 0;
+    right: auto;
+    width: 3px;
+    height: auto;
+    transform: scaleY(0);
+  }
+  .rail .tab[aria-current='page'] { font-weight: var(--wt-bold); background: var(--plane-gold-wash); }
+  .rail .tab[aria-current='page']::before { transform: scaleY(1); }
+  .rail .tab__badge { position: static; margin-left: auto; }
+  .main { padding: var(--space-6) var(--space-6); padding-bottom: var(--space-9); }
+}
+
+/* ============================================================
+   THE PORTRAIT — the centrepiece of the whole direction
+   ============================================================ */
+
+.poster {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  margin-bottom: var(--space-6);
+}
+/* The figure comes first on every size. Putting the score above it on a phone
+   did keep the number above the fold, but it inverted the thesis: you read your
+   day before you saw it, which is the one thing this design exists not to do.
+   The portrait is capped shorter on a phone instead, so the figure and the
+   score both clear the fold. */
+@media (max-width: 559px) {
+  .portrait { max-width: 268px; }
+}
+@media (min-width: 560px) {
+  .poster { grid-template-columns: minmax(200px, 300px) 1fr; gap: var(--space-6); }
+}
+@media (min-width: 1024px) {
+  .poster { grid-template-columns: minmax(280px, 420px) 1fr; gap: var(--space-7); }
+}
+
+/* The figure is printed on paper, in both schemes. This is not a light-mode
+   leftover: the mechanic is that an unmarked habit lets the paper show through,
+   so the ground has to be paper for the absence to read — and the portrait's
+   largest plane is black, which vanished against the night scheme's page. A
+   cream sheet on a dark page is a print on a dark table. */
+.portrait {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 120 / 160;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+@media (min-width: 1024px) {
+  /* Monumental is the point; at desktop width the figure gets the scale the
+     form has in life rather than sitting in a thumbnail. */
+  .portrait { max-width: 420px; }
+}
+.portrait__svg { width: 100%; height: 100%; display: block; }
+
+/* A plane. Hidden by clip-path so it can wipe in along one axis — a hard-edged
+   shape has no business fading. */
+.plane {
+  transition: clip-path var(--dur-4) var(--ease-plane);
+}
+.plane[data-wipe='right'][data-on='false'] { clip-path: inset(0 100% 0 0); }
+.plane[data-wipe='left'][data-on='false'] { clip-path: inset(0 0 0 100%); }
+.plane[data-wipe='down'][data-on='false'] { clip-path: inset(0 0 100% 0); }
+.plane[data-wipe='up'][data-on='false'] { clip-path: inset(100% 0 0 0); }
+.plane[data-on='true'] { clip-path: inset(0 0 0 0); }
+
+/* Interactive planes: the figure is the control surface. Each plane is a real
+   button sitting over its shape. */
+.plane-hit {
+  cursor: pointer;
+  transition: opacity var(--dur-2) var(--ease-plane);
+}
+.plane-hit:hover { opacity: 0.82; }
+.plane-hit:focus-visible {
+  outline: 3px solid var(--plane-indigo);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* The score, in the poster's margin. */
+.poster__margin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.score__value {
+  font-size: var(--fs-display);
+  font-weight: var(--wt-black);
+  letter-spacing: var(--tracking-tight);
+  line-height: 0.86;
+}
+/* A day in deficit — every shared habit skipped costs its points — reads as a
+   deficit rather than as a neutral figure. */
+.score__value--neg { color: var(--negative); }
+.score__of {
+  font-size: var(--fs-lg);
+  font-weight: var(--wt-semi);
+  color: var(--ink-faint);
+}
+.score__label {
+  font-size: var(--fs-caption);
+  font-weight: var(--wt-semi);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* A run of days, as a row of small filled/empty cells. Labelled, unlike the
+   20 decorative aria-hidden dots this replaces. */
+.run {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+}
+/* An unfilled cell needs to be visibly a cell, not absent. --bg-sunk on --bg is
+   a one-step difference that disappeared entirely on the night scheme. */
+.run__cell {
+  width: 11px;
+  height: 22px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.run__cell--on { background: var(--plane-indigo); box-shadow: none; }
+.run__cell--part { background: var(--plane-gold); box-shadow: none; }
+
+/* ---- the roster: every habit, named, on the same grid ----
+   The second half of Tanaka's composition rule: a monumental figure beside a
+   whisper-quiet caption grid. This is the caption grid, and it is the reason
+   the direction can carry an Operate surface — you can always read which
+   plane is which. */
+/* Capped, and not for taste: at full page width the mark button ended up a
+   thousand pixels from the habit it marks, so the label and its control stopped
+   reading as one row. */
+.section--tight { max-width: 760px; }
+
+.roster { border-top: 1px solid var(--rule-strong); }
+
+.hrow {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+/* The swatch says which plane this row owns, and whether it has landed. An
+   unlanded one is an empty cell, not a nearly-invisible one — at 22% opacity a
+   gold swatch disappeared entirely on the night scheme. */
+.hrow__swatch {
+  width: 16px;
+  height: 16px;
+  background: var(--hswatch, var(--plane-indigo));
+  transition: opacity var(--dur-2) var(--ease-plane), background var(--dur-2) var(--ease-plane);
+}
+.hrow--off .hrow__swatch {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.hrow__body { min-width: 0; }
+.hrow__name {
+  font-size: var(--fs-base);
+  font-weight: var(--wt-semi);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.hrow__meta {
+  font-size: var(--fs-sm);
+  color: var(--ink-faint);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.hrow__part { font-style: italic; }
+.hrow__controls { display: flex; align-items: center; gap: var(--space-2); }
+
+/* The mark control. 44px minimum, because on a phone this is the product. */
+.mark {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-control);
+  color: transparent;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease-plane),
+    border-color var(--dur-2) var(--ease-plane), color var(--dur-2) var(--ease-plane);
+}
+.mark:hover { border-color: var(--ink-quiet); }
+.mark[aria-pressed='true'] {
+  background: var(--mark-on, var(--plane-indigo));
+  border-color: var(--mark-on, var(--plane-indigo));
+  /* Not --bg: a black-plane habit's checkmark was --bg on --plane-black, and at
+     night those are #131313 on #0d0d0d — invisible. --mark-ink is chosen per
+     fill (see HabitRoster.jsx) so it holds contrast against whichever of the
+     four planes this habit actually uses. */
+  color: var(--mark-ink, var(--on-plane-black));
+}
+.mark--slip[aria-pressed='true'] {
+  background: var(--negative);
+  border-color: var(--negative);
+  color: var(--accent-ink);
+}
+.mark--sm { width: 36px; height: 36px; }
+
+.counter {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.counter__btn {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  color: var(--ink-quiet);
+  cursor: pointer;
+}
+.counter__btn:hover { background: var(--plane-gold-wash); color: var(--ink); }
+.counter__value {
+  min-width: 56px;
+  padding-inline: var(--space-2);
+  text-align: center;
+  font-weight: var(--wt-bold);
+  font-size: var(--fs-sm);
+  border-inline: 1px solid var(--rule);
+}
+
+/* Floating points, when a mark lands. */
+.float-pts {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--wt-black);
+  color: var(--plane-indigo);
+  pointer-events: none;
+  animation: float-up var(--dur-4) var(--ease-out) forwards;
+}
+.float-pts--neg { color: var(--negative); }
+@keyframes float-up {
+  from { transform: translateY(4px); opacity: 1; }
+  to { transform: translateY(-22px); opacity: 0; }
+}
+
+/* ============================================================
+   LEADERBOARD — a real table, so rank and score belong to a player
+   ============================================================ */
+
+/* Capped for the same reason as the roster: at full page width a player's name
+   and their score sat a thousand pixels apart. */
+.board { width: 100%; max-width: 720px; border-collapse: collapse; }
+.board caption { text-align: left; margin-bottom: var(--space-3); }
+.board th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule-strong);
+  font-size: var(--fs-caption);
+  font-weight: var(--wt-semi);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.board th:last-child,
+.board td:last-child { text-align: right; }
+.board td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+.board tbody tr:hover { background: var(--plane-gold-wash); }
+.board tr[data-me='true'] { background: var(--plane-indigo-wash); }
+.board__rank {
+  width: 1%;
+  font-weight: var(--wt-black);
+  font-size: var(--fs-lg);
+  white-space: nowrap;
+}
+/* First place is marked by a gold plane as well as by its number, so rank is
+   never carried by colour alone. */
+.board__rank--first { color: var(--plane-gold); }
+.board__rank--first::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  background: var(--plane-gold);
+  vertical-align: 2px;
+}
+.board__who { display: flex; align-items: center; gap: var(--space-3); }
+.board__score { font-weight: var(--wt-black); font-size: var(--fs-lg); white-space: nowrap; }
+/* A week in deficit reads as a deficit. */
+.board__score--neg { color: var(--negative); }
+
+/* Each player's day, as a small figure. This is what the leaderboard is for in
+   this world: a series of figures at different degrees of resolution. */
+/* Same reasoning as .portrait: paper ground in both schemes, so the black plane
+   is visible and an unlanded plane reads as paper showing through. */
+.mini {
+  width: 38px;
+  aspect-ratio: 120 / 160;
+  background: var(--paper);
+  flex-shrink: 0;
+}
+.mini--lg { width: 56px; }
+
+/* ============================================================
+   STATS — one chart system, and the 30-day run as a contact sheet
+   ============================================================ */
+
+.chart-box { width: 100%; max-width: 720px; height: 210px; }
+.contact-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: var(--space-2);
+  max-width: 720px;
+}
+.contact-sheet__cell {
+  display: block;
+  aspect-ratio: 120 / 160;
+  border: 1px solid transparent;
+}
+.contact-sheet__cell:hover { border-color: var(--rule-strong); }
+/* Fill the cell rather than sitting fixed-width in its corner — at 38px a
+   twelve-plane figure resolved into a smudge regardless of the cell it sat in. */
+.contact-sheet__cell .mini { width: 100%; }
+
+.callouts { display: grid; gap: var(--space-4); }
+/* Marked by a plane block, not a border down the side. */
+.callout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.callout::before {
+  content: '';
+  flex: 0 0 14px;
+  align-self: stretch;
+  min-height: 14px;
+  background: var(--edge, var(--plane-indigo));
+}
+
+/* ---- the bank: debt as a plane pushed off the figure ---- */
+.bank { display: flex; flex-direction: column; gap: var(--space-3); }
+.bank__track {
+  height: 10px;
+  background: var(--bg-sunk);
+}
+/* Scaled, not width-animated: animating width relayouts on every frame. */
+.bank__fill {
+  height: 100%;
+  background: var(--plane-gold);
+  transform-origin: left center;
+  transition: transform var(--dur-4) var(--ease-plane);
+}
+.bank--clear .bank__fill { background: var(--plane-indigo); }
+
+/* ============================================================
+   CHAT
+   ============================================================ */
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 56dvh;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+.msg { display: flex; gap: var(--space-3); align-items: flex-start; }
+.msg--mine { flex-direction: row-reverse; }
+.msg__body { max-width: 78%; }
+.msg--mine .msg__body { text-align: right; }
+.msg__meta {
+  font-size: var(--fs-caption);
+  font-weight: var(--wt-semi);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 2px;
+}
+/* Whose message it is comes from the side it sits on and the tint of its field —
+   alignment and colour, not a stripe glued to one edge. */
+.msg__text {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg--mine .msg__text { background: var(--plane-indigo-wash); }
+.msg--sys {
+  font-size: var(--fs-sm);
+  color: var(--ink-faint);
+  text-align: center;
+  font-style: italic;
+}
+.composer { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+.composer .field { flex: 1; margin: 0; }
+
+/* ---- avatar: a plane, not an emoji ----
+   The 14 emoji avatars rendered differently on every OS and sat on the text
+   baseline with no alignment control. A player is now a plane mark with their
+   initial: one shape, one letter, always aligned. */
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: var(--av-bg, var(--plane-indigo));
+  color: #fffdf7;
+  font-size: var(--fs-sm);
+  font-weight: var(--wt-black);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.avatar--gold { color: var(--plane-black); }
+.avatar--lg { width: 44px; height: 44px; font-size: var(--fs-lg); }
+.avatar--sm { width: 24px; height: 24px; font-size: var(--fs-caption); }
+/* Four silhouettes, so two players with the same initial still differ. */
+.avatar--s0 { clip-path: none; }
+.avatar--s1 { clip-path: circle(50%); }
+.avatar--s2 { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0); border-radius: 0; }
+.avatar--s3 { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+
+.roster-strip { gap: 4px; align-items: center; }
+
+/* ============================================================
+   LEDGER
+   ============================================================ */
+
+.ledger { width: 100%; border-collapse: collapse; }
+.ledger td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--fs-sm);
+}
+.ledger td:first-child { color: var(--ink-faint); white-space: nowrap; }
+.ledger__pts { text-align: right; font-weight: var(--wt-bold); white-space: nowrap; }
+.ledger__pts--pos { color: var(--plane-indigo); }
+.ledger__pts--neg { color: var(--negative); }
+
+/* ============================================================
+   ENTRANCE — sign in, join, landing. The one Persuade-ish surface.
+   ============================================================ */
+
+.gate {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 900px) {
+  .gate { grid-template-columns: 1.05fr 1fr; }
+}
+
+/* The left half is a poster. At this size the figure is monumental — the scale
+   the form has in life, rather than a shape trapped in a card. */
+/* Ground: a full indigo field, not black. The portrait's largest plane IS
+   black, so a black ground made the profile — the one shape that makes the
+   figure read — disappear into it. Indigo is a plane of this world owning a
+   whole region, which is how the colour strategy is meant to work, and all four
+   planes hold their weight against it in either scheme. */
+.gate__poster {
+  position: relative;
+  overflow: hidden;
+  background: var(--plane-indigo);
+  color: #f7f2e6;
+  padding: var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 46dvh;
+}
+.gate__figure {
+  position: absolute;
+  right: -8%;
+  bottom: -6%;
+  width: min(78%, 460px);
+  pointer-events: none;
+}
+/* Inside the poster the figure bleeds; it is not a framed object. It keeps its
+   planes legible against the indigo field because assignPlanes is told what
+   colour the ground is — see the `avoid` option in src/planes.js — not because
+   a backing plate is pasted behind it. */
+.gate__figure .portrait,
+.gate__poster .mini {
+  border: 0;
+  background: none;
+  max-width: none;
+}
+.gate__hero {
+  position: relative;
+  font-size: var(--fs-2xl);
+  font-weight: var(--wt-black);
+  letter-spacing: var(--tracking-tight);
+  max-width: 22ch;
+}
+.gate__lede { position: relative; max-width: 34ch; color: rgba(247, 242, 230, 0.82); }
+.gate__panel {
+  padding: var(--space-6) var(--space-5);
+  padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.gate__panel-inner { width: 100%; max-width: 400px; margin: 0 auto; }
+@media (min-width: 900px) {
+  .gate__poster { min-height: 100dvh; padding: var(--space-8) var(--space-7); justify-content: flex-end; }
+  .gate__hero { font-size: clamp(2.5rem, 3.4vw, 3.75rem); }
+  .gate__panel { padding: var(--space-8) var(--space-7); }
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+  color: var(--ink-faint);
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+/* ---- rooms list on the landing screen ---- */
+.rooms { border-top: 1px solid var(--rule-strong); }
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.room-row__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+}
+.room-row__name { font-weight: var(--wt-semi); }
+.room-row__code {
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-faint);
+}
+
+/* ---- swatch / icon pickers ---- */
+.swatches { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.swatch {
+  width: var(--tap);
+  height: var(--tap);
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.swatch[aria-pressed='true'] { border-color: var(--ink); }
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tap), 1fr));
+  gap: var(--space-2);
+}
+
+/* The mark picker shows printed marks, so its wells are paper in both schemes.
+   On the night scheme's near-black chip the black mark was invisible — one of
+   the four options simply could not be seen. */
+.picker-grid--marks .chip {
+  background: var(--paper);
+  border-color: var(--rule-strong);
+  padding: var(--space-1);
+  justify-content: center;
+}
+.picker-grid--marks .chip[aria-pressed='true'] {
+  background: var(--paper);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* ---- the invite row ---- */
+.invite {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--bg-sunk);
+}
+.invite__code {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+footer.foot {
+  margin-top: var(--space-8);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}

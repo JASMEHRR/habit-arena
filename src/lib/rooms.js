@@ -8,22 +8,40 @@
 // player.display_name etc without change.
 import { supabase } from '../supabaseClient.js'
 import { todayStr, lastNDays } from '../scoring.js'
+import { fitBatch } from '../budget.js'
 
 // How many days of entry history to load (for dot-strips, charts, streaks, bank).
 export const HISTORY_DAYS = 30
 
-// Equal daily point budget: every player gets the same 3 mandatory habits
-// (skipping one costs you the points, not just 0), plus the same custom
-// budget for whatever else they add — so everyone's day maxes out at the
-// same total regardless of how many habits they personally set up.
+// The default daily point target for a brand-new room. It is a per-room
+// setting from here on (rooms.point_target) — every member can adjust it in
+// Settings, and everything downstream reads the room's actual value, falling
+// back to this constant only if the column is missing (pre-migration data).
 export const DAILY_POINT_TARGET = 30
+
+// Seeded on join so a room isn't blank on day one. They are NOT protected:
+// is_mandatory only drives the "shared" badge in the UI. Every field on every
+// habit — including these — can be edited or removed via updateHabit/removeHabit.
+// Colours are the four planes of the design system (see src/planes.js); the
+// three biggest habits carry the three biggest planes of the portrait.
 export const MANDATORY_HABITS = [
-  { label: 'Brush teeth', icon: 'brush', color: '#38bdf8', points: 5 },
-  { label: 'Drink water', icon: 'droplet', color: '#22d3ee', points: 5 },
-  { label: 'Sleep on time', icon: 'moon', color: '#a78bfa', points: 5 },
+  { label: 'Brush teeth', icon: 'brush', color: '#c8a24b', points: 5 },
+  { label: 'Drink water', icon: 'droplet', color: '#1e3a8a', points: 5 },
+  { label: 'Sleep on time', icon: 'moon', color: '#111111', points: 5 },
 ]
-export const MANDATORY_POINTS_TOTAL = MANDATORY_HABITS.reduce((sum, h) => sum + h.points, 0)
-export const CUSTOM_POINT_BUDGET = DAILY_POINT_TARGET - MANDATORY_POINTS_TOTAL
+
+// A room's actual daily point target, with a fallback for rows saved before
+// the point_target column existed (or before schema.sql's V5 block has been
+// run against this database).
+export function pointTargetFor(room) {
+  return room?.point_target ?? DAILY_POINT_TARGET
+}
+
+export async function updateRoomTarget(roomId, target) {
+  const clamped = Math.max(1, Math.round(Number(target) || DAILY_POINT_TARGET))
+  const { error } = await supabase.from('rooms').update({ point_target: clamped }).eq('id', roomId)
+  if (error) throw error
+}
 
 async function seedMandatoryHabits(playerId) {
   for (const h of MANDATORY_HABITS) {
@@ -134,11 +152,12 @@ export async function leaveRoom(playerId) {
   if (error) throw error
 }
 
-// Copy this account's CUSTOM habits from another of its rooms into the
-// current player (mandatory habits are never copied — the target player
-// already has their own, seeded on join). Skips any habit that would blow
-// the target's custom-point budget. Returns how many habits were copied.
-export async function copyHabitsFrom(fromCode, userId, toPlayerId) {
+// Copy this account's own habits from another of its rooms into the current
+// player (the shared starter habits are never copied — the target player
+// already has their own, seeded on join). Every copied habit's points are
+// fitted to the target room's budget rather than skipped if it would have
+// blown it — see src/budget.js. Returns how many habits were copied.
+export async function copyHabitsFrom(fromCode, userId, toPlayerId, roomPointTarget) {
   const src = await getRoomByCode(fromCode)
   if (!src) throw new Error('That room no longer exists.')
   const { data: srcPlayer, error: spErr } = await supabase
@@ -153,23 +172,22 @@ export async function copyHabitsFrom(fromCode, userId, toPlayerId) {
     .eq('is_mandatory', false)
     .order('created_at', { ascending: true })
   if (error) throw error
+  if (!habits.length) return 0
 
   const { data: existing, error: exErr } = await supabase
-    .from('habits').select('points, is_mandatory').eq('player_id', toPlayerId)
+    .from('habits').select('points').eq('player_id', toPlayerId)
   if (exErr) throw exErr
-  let used = existing.filter((h) => !h.is_mandatory).reduce((s, h) => s + h.points, 0)
+  const used = existing.reduce((s, h) => s + h.points, 0)
+  const target = roomPointTarget ?? DAILY_POINT_TARGET
 
-  let copied = 0
-  for (const h of habits) {
-    if (used + h.points > CUSTOM_POINT_BUDGET) continue // would blow the budget, skip it
+  const fitted = fitBatch(habits, used, target)
+  for (const h of fitted) {
     await addHabit(toPlayerId, {
       label: h.label, kind: h.kind, points: h.points, bad_mode: h.bad_mode,
       icon: h.icon, color: h.color, target: h.target, unit: h.unit, is_bank: h.is_bank,
     })
-    used += h.points
-    copied++
   }
-  return copied
+  return fitted.length
 }
 
 // Load the whole room: room + all players (each with habits), plus a window of
@@ -248,6 +266,25 @@ export async function addHabit(playerId, habit) {
 
 export async function removeHabit(habitId) {
   const { error } = await supabase.from('habits').delete().eq('id', habitId)
+  if (error) throw error
+}
+
+// Edit any habit in place — including the three shared ones. Every field is
+// writable: label, icon, colour, kind/bad_mode, target/unit, and points. There
+// is no separate "is this mandatory" guard here; the caller decides what may be
+// changed, this just writes it.
+export async function updateHabit(habitId, fields) {
+  const patch = {}
+  if (fields.label !== undefined) patch.label = fields.label
+  if (fields.icon !== undefined) patch.icon = fields.icon
+  if (fields.color !== undefined) patch.color = fields.color
+  if (fields.kind !== undefined) patch.kind = fields.kind
+  if (fields.bad_mode !== undefined) patch.bad_mode = fields.kind === 'bad' ? fields.bad_mode : null
+  if (fields.points !== undefined) patch.points = fields.points
+  if (fields.target !== undefined) patch.target = fields.target
+  if (fields.unit !== undefined) patch.unit = fields.unit
+  if (fields.is_bank !== undefined) patch.is_bank = fields.is_bank
+  const { error } = await supabase.from('habits').update(patch).eq('id', habitId)
   if (error) throw error
 }
 

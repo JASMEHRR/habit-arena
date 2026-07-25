@@ -1,0 +1,138 @@
+/* Reset, document ground, and the two global guards: focus visibility and
+   reduced motion. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  /* The old sheet blocked pinch zoom with maximum-scale=1.0. It is gone, so
+     text can be scaled by the user; nothing here assumes a fixed root size. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--bg);
+  background-image: var(--paper-texture);
+  background-size: var(--paper-texture-size);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  font-weight: var(--wt-regular);
+  line-height: var(--lh-body);
+  /* Every number in this app is compared against another number in a column. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, p, figure, blockquote, dl, dd {
+  margin: 0;
+}
+
+h1, h2, h3, h4 {
+  font-weight: var(--wt-bold);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+
+ul, ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img, svg, video {
+  display: block;
+  max-width: 100%;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  font-variant-numeric: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+code, kbd, samp {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+/* Mouse users get no ring; keyboard users get an unmissable one. A two-stop
+   ring (ground, then indigo) survives on paper and on black alike. */
+:focus { outline: none; }
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  /* So the ring is never clipped by an ancestor's overflow. */
+  position: relative;
+  z-index: 2;
+}
+
+::selection {
+  background: var(--plane-gold);
+  color: var(--plane-black);
+}
+
+/* Skip link — the shell is a fixed tab bar plus a header, so keyboard users
+   need a way past it. Visible only when focused. */
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  z-index: 100;
+  padding: var(--space-3) var(--space-4);
+  background: var(--plane-indigo);
+  color: #fffdf7;
+  font-size: var(--fs-sm);
+  font-weight: var(--wt-semi);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  transform: translateY(-200%);
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ---- the one reduced-motion guard ----
+   The old sheet had none: two infinitely drifting background blobs, a rAF
+   count-up, floating point bubbles, a sweeping ring and two confetti bursts all
+   animated regardless. Everything declarative is stopped here; the two
+   JS-driven ones (confetti, the count-up) ask useReducedMotion instead. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Deliberately NOT touching .plane's clip-path. The clip is not decoration —
+     it is how an unmarked habit is absent from the figure. Clearing it here
+     showed every plane as landed, so a reduced-motion user saw a complete
+     portrait no matter what they had actually done. The transition-duration
+     override above is what makes the wipe instant; that is all that was wanted. */
+}

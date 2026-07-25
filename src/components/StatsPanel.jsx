@@ -1,87 +1,146 @@
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, Cell, PieChart, Pie,
-} from 'recharts'
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { weeklySeries, completionRate, heatmap, habitCallouts } from '../stats.js'
+import { weeklySeries, completionRate, heatmap, habitCallouts, dayCompletion } from '../stats.js'
+import { MiniPortrait } from './PlanePortrait.jsx'
+import { planeOn } from './HabitRoster.jsx'
+import { EmptyState, Sheet, Stat } from './ui/Primitives.jsx'
 
-// Weekly bar chart + completion donut + streak heatmap + best/missed callouts.
+// Stats.
+//
+// Two structural changes:
+//   - one chart system. The dashboard used to hand-roll the same two charts in
+//     CSS (div heights and a conic-gradient) while this panel drew them in
+//     recharts, so the same numbers had two different looks.
+//   - the 30-day heatmap becomes a contact sheet of figures. Thirty unlabelled
+//     colour cells whose only affordance was a `title` tooltip told a phone user
+//     nothing at all; thirty small portraits show the same month and are legible
+//     without hovering.
 export default function StatsPanel({ habits, entriesByHabit, days }) {
   const series = weeklySeries(habits, entriesByHabit, days)
   const rate = completionRate(habits, entriesByHabit, days)
   const heat = heatmap(habits, entriesByHabit, days)
   const { best, missed } = habitCallouts(habits, entriesByHabit, days)
 
-  const donut = [
-    { name: 'done', value: rate },
-    { name: 'rest', value: 100 - rate },
-  ]
+  // A player with no habits used to get a zero-height bar chart, a 0% donut, a
+  // grey heatmap and no callouts: a card of empty chrome.
+  if (habits.length === 0) {
+    return (
+      <EmptyState title="No stats yet">
+        Add a habit or two and this fills in: points per day, how much of each
+        day you complete, and the last thirty days as a run of portraits.
+      </EmptyState>
+    )
+  }
+
+  const logged = days.some((d) => dayCompletion(habits, entriesByHabit, d).earned !== 0)
 
   return (
-    <div className="card stats">
-      <h2>Your stats</h2>
-
-      <div className="stats-charts">
-        <div className="chart-box">
-          <span className="chart-label">Points this week</span>
-          <ResponsiveContainer width="100%" height={130}>
-            <BarChart data={series} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
-              <XAxis dataKey="label" tick={{ fill: '#9aa0c2', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                contentStyle={{ background: '#161a2e', border: '1px solid #2b3050', borderRadius: 10, color: '#eef0fb' }} />
-              <Bar dataKey="points" radius={[6, 6, 0, 0]}>
-                {series.map((d, i) => (
-                  <Cell key={i} fill={d.points < 0 ? '#ff5c78' : 'url(#barGrad)'} />
-                ))}
-              </Bar>
-              <defs>
-                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#f59e0b" />
-                  <stop offset="100%" stopColor="#10b981" />
-                </linearGradient>
-              </defs>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="chart-box donut-box">
-          <span className="chart-label">Completion</span>
-          <div className="donut-wrap">
-            <ResponsiveContainer width="100%" height={130}>
-              <PieChart>
-                <Pie data={donut} dataKey="value" innerRadius={40} outerRadius={58}
-                  startAngle={90} endAngle={-270} stroke="none">
-                  <Cell fill="#10b981" />
-                  <Cell fill="rgba(255,255,255,0.08)" />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="donut-center"><b>{rate}%</b><span>avg</span></div>
-          </div>
-        </div>
-      </div>
-
-      <span className="chart-label">Last 30 days</span>
-      <div className="heat">
-        {heat.map((h) => (
-          <span key={h.date} className="heat-cell" title={`${h.date}: ${Math.round(h.pct)}%`}
-            style={{ background: heatColor(h.pct) }} />
-        ))}
-      </div>
-
-      <div className="callouts">
+    <>
+      <div className="row" style={{ gap: 'var(--space-7)', marginBottom: 'var(--space-6)' }}>
+        <Stat label="Completion" value={`${rate}%`} foot={`over ${days.length} days`} size="lg" />
         {best && best.done > 0 && (
-          <div className="callout up"><TrendingUp size={15} /> Best: <b>{best.habit.label}</b> ({best.done}/{best.total})</div>
-        )}
-        {missed && missed.total - missed.done > 0 && (
-          <div className="callout down"><TrendingDown size={15} /> Most missed: <b>{missed.habit.label}</b></div>
+          <Stat label="Most kept" value={best.habit.label} foot={`${best.done} of ${best.total} days`} />
         )}
       </div>
-    </div>
+
+      <Sheet title="Points per day" className="section--tight" style={{ marginBottom: 'var(--space-5)' }}>
+        {!logged ? (
+          <p className="quiet small">Nothing logged in this window yet.</p>
+        ) : (
+          <div className="chart-box">
+            <ResponsiveContainer width="100%" height="100%">
+              {/* Flat fills, a hairline baseline, no rounded bars, no gradient,
+                  no shadowed tooltip card — the world elsewhere bans exactly
+                  these ("no outlines... nothing here is allowed to be a
+                  rounded-corner card"), and this was the one place still built
+                  like a stock chart library rather than this poster. */}
+              <BarChart data={series} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: 'var(--ink-faint)', fontSize: 11 }}
+                  axisLine={{ stroke: 'var(--rule-strong)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: 'var(--ink-faint)', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={40}
+                />
+                <Tooltip
+                  cursor={{ fill: 'var(--plane-gold-wash)' }}
+                  contentStyle={{
+                    background: 'var(--surface-raised)',
+                    border: '1px solid var(--rule-strong)',
+                    borderRadius: 0,
+                    boxShadow: 'none',
+                    color: 'var(--ink)',
+                  }}
+                />
+                <Bar dataKey="points" radius={0}>
+                  {series.map((d, i) => (
+                    <Cell key={i} fill={d.points < 0 ? 'var(--negative)' : 'var(--plane-indigo)'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Sheet>
+
+      <Sheet title="The last 30 days" className="section--tight">
+        <p className="quiet small" style={{ marginBottom: 'var(--space-4)' }}>
+          One portrait per day. A complete figure is a complete day.
+        </p>
+        <ol className="contact-sheet">
+          {heat.map((h) => (
+            <li key={h.date}>
+              <DayFigure
+                date={h.date}
+                pct={h.pct}
+                habits={habits}
+                entriesByHabit={entriesByHabit}
+              />
+            </li>
+          ))}
+        </ol>
+      </Sheet>
+
+      {missed && missed.total - missed.done > 0 && (
+        <div className="callouts" style={{ marginTop: 'var(--space-5)' }}>
+          <p className="callout" style={{ '--edge': 'var(--negative)' }}>
+            <TrendingDown size={15} aria-hidden="true" />
+            <span>
+              Most missed: <strong>{missed.habit.label}</strong>, {missed.total - missed.done} of{' '}
+              {missed.total} days
+            </span>
+          </p>
+          {best && best.done > 0 && (
+            <p className="callout" style={{ '--edge': 'var(--plane-indigo)' }}>
+              <TrendingUp size={15} aria-hidden="true" />
+              <span>
+                Most kept: <strong>{best.habit.label}</strong>, {best.done} of {best.total} days
+              </span>
+            </p>
+          )}
+        </div>
+      )}
+    </>
   )
 }
 
-function heatColor(pct) {
-  if (pct <= 0) return 'rgba(255,255,255,0.06)'
-  const a = 0.25 + (pct / 100) * 0.75
-  return `rgba(16, 185, 129, ${a})`
+function DayFigure({ date, pct, habits, entriesByHabit }) {
+  const label = `${new Date(date + 'T00:00:00').toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  })}: ${Math.round(pct)} per cent complete`
+  return (
+    <span className="contact-sheet__cell" title={label}>
+      <MiniPortrait
+        habits={habits}
+        isOn={(h) => planeOn(h, entriesByHabit, date)}
+        label={label}
+      />
+    </span>
+  )
 }

@@ -2,17 +2,72 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <title>Habit Arena — Compete on your daily life</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Habit Arena — one room, one board, one day at a time</title>
+    <meta name="description" content="A shared daily board for ordinary habits. Everyone in the room gets the same 30 points a day. Mark yours and see where you stand." />
+    <meta name="theme-color" content="#F2E8D5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)" />
+
+    <!--
+      DIRECTION CONTRACT — Habit Arena (seed 240cb42d, mode operate)
+
+      THESIS: Your day is a portrait assembled from flat planes, one plane per
+      habit. Mark a habit and its plane lands; skip it and the plane is simply
+      absent, so the person does not resolve. It refuses the two pages this
+      category ships: the pastel tracker with a mint progress ring, and the
+      black-and-neon esports arena the app used to be.
+
+      OWN-WORLD: Ikko Tanaka's poster language. Washi-paper ground; monumental
+      hard-edged planes in vermilion, indigo, gold and black; no outlines
+      anywhere; everything locked to one modular grid. Archivo alone — heavy
+      tight display, whisper-quiet wide-tracked caps for captions, tabular
+      figures for every number. Night scheme is the same four planes on black
+      linen. Planes own whole regions; nothing is an accent.
+
+      STORY: A visitor sees a half-built portrait and understands the day is
+      unfinished before reading a word; marks a habit, watches its plane wipe
+      in and the figure resolve; then sees the room's other figures ranked and
+      knows exactly where they stand.
+
+      FIRST VIEWPORT: Phone. Wordmark and room reference in tracked caps on a
+      hairline rule. Below it the portrait at full column width, planes tappable
+      at 44px minimum, the paper showing through wherever a habit is unmarked.
+      The score sits in the margin beside it as tabular figures, out of 30.
+      Under the figure, the plane roster: one quiet labeled row per habit, same
+      grid, each row a second way to mark the same plane. Primary action is a
+      plane.
+
+      FORM: Plane Portrait (tanaka-plane-portrait), dealt as a challenger
+      against grounded candidate 4 (the attendance register) and chosen by the
+      user over it. No staging from the seed was taken; the composition is
+      Tanaka's own monumental-figure-plus-quiet-caption-grid, which this task
+      needed more than the dealt portal-peephole staging.
+    -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Russo+One&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400..900&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
     <div id="root"></div>
+    <!-- Resolve the theme before first paint. The stylesheet keys everything off
+         a single data-theme attribute, so without this the paper scheme would
+         flash before React mounts on a device set to night. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('habit-arena.theme')
+          var dark = saved ? saved === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light')
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

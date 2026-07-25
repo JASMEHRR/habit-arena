@@ -1,22 +1,33 @@
 import { useState } from 'react'
-import { addHabit, CUSTOM_POINT_BUDGET } from '../lib/rooms.js'
-import { iconKeyFor, iconComponent, ICON_CHOICES, HABIT_COLORS } from '../icons.js'
+import { addHabit } from '../lib/rooms.js'
+import { iconKeyFor, iconComponent, ICON_CHOICES } from '../icons.js'
+import { PLANE_COLORS } from '../planes.js'
+import { fitPoints } from '../budget.js'
+import { Button, Field, Sheet } from './ui/Primitives.jsx'
+import { useToast } from './ui/Toast.jsx'
 
-// Built-in "daily necessities" — one-tap quick-adds (§3).
+// One-tap quick-adds. Colours are the four planes now: a free colour picker
+// would let one player's portrait leave the palette, and the composition only
+// holds together because there are exactly four.
 const PRESETS = [
-  { label: 'Sleep', icon: 'moon', kind: 'good', points: 4, target: 8, unit: 'hours', is_bank: true, color: '#7c6cff' },
-  { label: 'Brush teeth', icon: 'brush', kind: 'good', points: 2, target: 2, unit: '', color: '#06b6d4' },
-  { label: 'Shower', icon: 'shower', kind: 'good', points: 2, target: 1, color: '#3b82f6' },
-  { label: 'Drink water', icon: 'droplet', kind: 'good', points: 2, target: 8, unit: 'glasses', is_bank: true, color: '#06b6d4' },
-  { label: 'Exercise', icon: 'dumbbell', kind: 'good', points: 5, target: 1, color: '#ef4444' },
-  { label: 'Eat healthy', icon: 'salad', kind: 'good', points: 4, target: 1, color: '#22c55e' },
-  { label: 'No doomscrolling', icon: 'phone', kind: 'bad', bad_mode: 'reward_avoid', points: 3, color: '#f97316' },
-  { label: 'Wake up early', icon: 'sun', kind: 'good', points: 4, target: 1, color: '#f59e0b' },
-  { label: 'Journaling', icon: 'pen', kind: 'good', points: 3, target: 1, color: '#8b5cf6' },
-  { label: 'Read', icon: 'book-open', kind: 'good', points: 3, target: 1, color: '#ec4899' },
-  { label: 'Meditate', icon: 'flower', kind: 'good', points: 3, target: 1, color: '#10b981' },
-  { label: 'Tidy space', icon: 'broom', kind: 'good', points: 2, target: 1, color: '#3b82f6' },
+  { label: 'Sleep', icon: 'moon', kind: 'good', points: 4, target: 8, unit: 'hours', is_bank: true, color: '#1e3a8a' },
+  { label: 'Shower', icon: 'shower', kind: 'good', points: 2, target: 1, color: '#1e3a8a' },
+  { label: 'Exercise', icon: 'dumbbell', kind: 'good', points: 5, target: 1, color: '#e43d24' },
+  { label: 'Eat healthy', icon: 'salad', kind: 'good', points: 4, target: 1, color: '#c8a24b' },
+  { label: 'No doomscrolling', icon: 'phone', kind: 'bad', bad_mode: 'reward_avoid', points: 3, color: '#111111' },
+  { label: 'Wake up early', icon: 'sun', kind: 'good', points: 4, target: 1, color: '#c8a24b' },
+  { label: 'Journaling', icon: 'pen', kind: 'good', points: 3, target: 1, color: '#111111' },
+  { label: 'Read', icon: 'book-open', kind: 'good', points: 3, target: 1, color: '#e43d24' },
+  { label: 'Meditate', icon: 'flower', kind: 'good', points: 3, target: 1, color: '#1e3a8a' },
+  { label: 'Tidy space', icon: 'broom', kind: 'good', points: 2, target: 1, color: '#c8a24b' },
 ]
+
+const COLOR_NAMES = {
+  '#e43d24': 'Vermilion',
+  '#1e3a8a': 'Indigo',
+  '#c8a24b': 'Gold',
+  '#111111': 'Black',
+}
 
 const SUGGEST = [
   [/exercise|workout|gym|run/i, 5], [/wake|early/i, 4], [/sleep/i, 4],
@@ -27,10 +38,11 @@ function suggestPoints(label, kind) {
   return kind === 'bad' ? 4 : 3
 }
 
-export default function HabitSetup({ player, onChanged }) {
+export default function HabitSetup({ player, pointTarget, onChanged }) {
+  const toast = useToast()
   const [label, setLabel] = useState('')
   const [icon, setIcon] = useState('check')
-  const [color, setColor] = useState(HABIT_COLORS[0])
+  const [color, setColor] = useState(PLANE_COLORS[0])
   const [kind, setKind] = useState('good')
   const [badMode, setBadMode] = useState('reward_avoid')
   const [points, setPoints] = useState(3)
@@ -39,13 +51,12 @@ export default function HabitSetup({ player, onChanged }) {
   const [pickIcon, setPickIcon] = useState(false)
   const [pointsTouched, setPointsTouched] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
 
-  // Everyone gets the same 3 mandatory habits (seeded on join) plus this same
-  // custom budget — so no one can out-earn another player just by adding
-  // more/higher-value habits.
-  const customUsed = player.habits.filter((h) => !h.is_mandatory).reduce((s, h) => s + h.points, 0)
-  const remaining = Math.max(0, CUSTOM_POINT_BUDGET - customUsed)
+  // The room's daily point target is shared, but nothing here blocks an add
+  // that would exceed it — see fitPoints. `remaining` is shown so the number is
+  // honest, not so it can reject anything.
+  const used = player.habits.reduce((s, h) => s + h.points, 0)
+  const remaining = Math.max(0, pointTarget - used)
 
   function updateLabel(v) {
     setLabel(v)
@@ -54,121 +65,237 @@ export default function HabitSetup({ player, onChanged }) {
   }
 
   async function add(habit) {
-    if (habit.points > remaining) {
-      setError(`Only ${remaining} custom pts left — lower this habit's points or remove another custom habit first.`)
-      return false
-    }
-    setError('')
     setBusy(true)
+    const fitted = fitPoints(habit.points, used, pointTarget)
     try {
-      await addHabit(player.id, habit)
-      onChanged()
+      await addHabit(player.id, { ...habit, points: fitted })
+      await onChanged()
+      if (fitted < habit.points) {
+        toast.push(
+          `Added “${habit.label}” at ${fitted} point${fitted === 1 ? '' : 's'} instead of ${habit.points} — that's what was left of the room's ${pointTarget}-point target.`,
+          'ok'
+        )
+      }
       return true
+    } catch (e) {
+      // This used to throw into nothing on a failed add.
+      toast.error(e)
+      return false
     } finally {
       setBusy(false)
     }
   }
 
-  async function addFromForm() {
+  async function addFromForm(e) {
+    e?.preventDefault()
     if (!label.trim()) return
     const is_bank = unit === 'hours' || unit === 'glasses'
     const ok = await add({
-      label: label.trim(), icon, color, kind,
-      points: Number(points) || 0, bad_mode: badMode,
-      target: Number(target) || 1, unit, is_bank,
+      label: label.trim(),
+      icon,
+      color,
+      kind,
+      points: Number(points) || 1,
+      bad_mode: badMode,
+      target: Number(target) || 1,
+      unit,
+      is_bank,
     })
     if (!ok) return
-    setLabel(''); setIcon('check'); setPointsTouched(false)
-    setPoints(suggestPoints('', kind)); setTarget(1); setUnit('')
+    setLabel('')
+    setIcon('check')
+    setPointsTouched(false)
+    setPoints(suggestPoints('', kind))
+    setTarget(1)
+    setUnit('')
   }
 
   const PickedIcon = iconComponent(icon)
 
   return (
-    <div className="card setup">
-      <h2>Add a habit</h2>
-      <p className="muted small">
-        Custom habit budget: {customUsed}/{CUSTOM_POINT_BUDGET} pts used — same for every player in this room.
+    <Sheet title="Add a habit" className="section--tight">
+      <p className="quiet small" style={{ marginBottom: 'var(--space-4)' }}>
+        {used} of {pointTarget} points used. Adding more than {remaining} left
+        shrinks the new habit's points to fit — it is always added.
       </p>
-      <div className="presets">
+
+      <p className="caption caption--ink">Quick add</p>
+      <div className="row row--tight" style={{ margin: 'var(--space-2) 0 var(--space-5)' }}>
         {PRESETS.map((p) => {
           const PIcon = iconComponent(p.icon)
           return (
-            <button key={p.label} className="chip" disabled={busy}
-              onClick={() => add({ ...p, target: p.target || 1, unit: p.unit || '', is_bank: !!p.is_bank })}>
-              <PIcon size={14} /> {p.label}
+            <button
+              key={p.label}
+              type="button"
+              className="chip"
+              disabled={busy}
+              onClick={() =>
+                add({ ...p, target: p.target || 1, unit: p.unit || '', is_bank: !!p.is_bank })
+              }
+            >
+              <PIcon size={14} aria-hidden="true" /> {p.label}
+              <span className="caption">+{p.points}</span>
             </button>
           )
         })}
       </div>
 
-      <div className="setup-form">
-        <div className="label-row">
-          <button className="icon-btn" style={{ '--habit': color }} onClick={() => setPickIcon((s) => !s)} title="Pick icon">
-            <PickedIcon size={20} />
-          </button>
-          <input placeholder="Habit name (e.g. Read)" value={label}
-            onChange={(e) => updateLabel(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addFromForm()} />
-        </div>
+      {/* A real form: Enter submits, and the browser validates. */}
+      <form onSubmit={addFromForm}>
+        <Field
+          label="Habit name"
+          id="habit-name"
+          value={label}
+          onChange={(e) => updateLabel(e.target.value)}
+          placeholder="Read"
+          required
+          maxLength={60}
+        />
+
+        {/* Matches the field pattern above: caption, then control. Reversed, it
+            read as an unexplained button with a word beside it. */}
+        <fieldset>
+          <legend>Icon</legend>
+          <Button
+            icon={<PickedIcon size={20} />}
+            label={pickIcon ? 'Close the icon picker' : 'Change the icon'}
+            aria-expanded={pickIcon}
+            onClick={() => setPickIcon((s) => !s)}
+          />
+          <span className="quiet small" style={{ marginLeft: 'var(--space-3)' }}>
+            {pickIcon ? 'Pick one below' : 'Chosen from the name — tap to change'}
+          </span>
+        </fieldset>
 
         {pickIcon && (
-          <div className="icon-picker">
+          <div className="picker-grid" style={{ marginBottom: 'var(--space-4)' }}>
             {ICON_CHOICES.map((k) => {
               const KI = iconComponent(k)
               return (
-                <button key={k} className={'ipick' + (k === icon ? ' on' : '')}
-                  onClick={() => { setIcon(k); setPickIcon(false) }}>
-                  <KI size={18} />
+                <button
+                  key={k}
+                  type="button"
+                  className="chip"
+                  aria-pressed={k === icon}
+                  aria-label={`Icon: ${k.replace('-', ' ')}`}
+                  style={{ justifyContent: 'center' }}
+                  onClick={() => {
+                    setIcon(k)
+                    setPickIcon(false)
+                  }}
+                >
+                  <KI size={18} aria-hidden="true" />
                 </button>
               )
             })}
           </div>
         )}
 
-        <div className="swatches">
-          {HABIT_COLORS.map((c) => (
-            <button key={c} className={'swatch' + (c === color ? ' on' : '')}
-              style={{ background: c }} onClick={() => setColor(c)} aria-label={'color ' + c} />
-          ))}
-        </div>
+        <fieldset>
+          <legend>Plane colour</legend>
+          <div className="swatches">
+            {PLANE_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className="swatch"
+                aria-pressed={c === color}
+                style={{ background: c }}
+                aria-label={COLOR_NAMES[c]}
+                title={COLOR_NAMES[c]}
+                onClick={() => setColor(c)}
+              />
+            ))}
+          </div>
+        </fieldset>
 
-        <div className="row">
-          <label className="seg"><input type="radio" checked={kind === 'good'} onChange={() => setKind('good')} /> Good habit</label>
-          <label className="seg"><input type="radio" checked={kind === 'bad'} onChange={() => setKind('bad')} /> Bad habit</label>
-        </div>
+        {/* A real radio group: shared name, so arrow keys work. The old pair had
+            no name attribute and so was not a group at all. */}
+        <fieldset>
+          <legend>Kind</legend>
+          <div className="row">
+            <label className="chip">
+              <input
+                type="radio"
+                name="habit-kind"
+                value="good"
+                checked={kind === 'good'}
+                onChange={() => setKind('good')}
+              />
+              Good habit
+            </label>
+            <label className="chip">
+              <input
+                type="radio"
+                name="habit-kind"
+                value="bad"
+                checked={kind === 'bad'}
+                onChange={() => setKind('bad')}
+              />
+              Bad habit
+            </label>
+          </div>
+        </fieldset>
 
         {kind === 'bad' ? (
-          <label className="field">How it scores
-            <select value={badMode} onChange={(e) => setBadMode(e.target.value)}>
+          <Field label="How it scores" id="bad-mode">
+            <select
+              className="field__control"
+              id="bad-mode"
+              value={badMode}
+              onChange={(e) => setBadMode(e.target.value)}
+            >
               <option value="reward_avoid">Reward me for avoiding it</option>
-              <option value="penalty_do">Penalize me if I do it</option>
+              <option value="penalty_do">Penalise me if I do it</option>
               <option value="both">Both</option>
             </select>
-          </label>
+          </Field>
         ) : (
-          <div className="row">
-            <label className="field">Daily target
-              <input type="number" className="num" min="1" value={target} onChange={(e) => setTarget(e.target.value)} />
-            </label>
-            <label className="field">Unit <small>(optional)</small>
-              <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+          <div className="grid-2">
+            <Field
+              label="Daily target"
+              type="number"
+              min="1"
+              inputMode="numeric"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+            />
+            <Field label="Unit" id="habit-unit" hint="Hours and glasses feed the Bank.">
+              <select
+                className="field__control"
+                id="habit-unit"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+              >
                 <option value="">reps</option>
-                <option value="hours">hours (bank)</option>
-                <option value="glasses">glasses (bank)</option>
+                <option value="hours">hours</option>
+                <option value="glasses">glasses</option>
               </select>
-            </label>
+            </Field>
           </div>
         )}
 
-        <label className="field">Points <small>(suggested, editable)</small>
-          <input type="number" className="num" min="0" value={points}
-            onChange={(e) => { setPointsTouched(true); setPoints(e.target.value) }} />
-        </label>
+        <Field
+          label="Points"
+          hint={
+            remaining > 0
+              ? `Suggested from the name. ${remaining} left before this room's ${pointTarget}-point target.`
+              : `Suggested from the name. Already at ${pointTarget} — this will still be added at 1 point.`
+          }
+          type="number"
+          min="1"
+          inputMode="numeric"
+          value={points}
+          onChange={(e) => {
+            setPointsTouched(true)
+            setPoints(e.target.value)
+          }}
+        />
 
-        <button onClick={addFromForm} disabled={busy || !label.trim()}>Add habit</button>
-        {error && <p className="errline">{error}</p>}
-      </div>
-    </div>
+        <Button type="submit" variant="primary" loading={busy} disabled={!label.trim()}>
+          Add habit
+        </Button>
+      </form>
+    </Sheet>
   )
 }

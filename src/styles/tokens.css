@@ -1,0 +1,183 @@
+/* Habit Arena — design tokens.
+   World: Ikko Tanaka's poster language. Washi-paper ground, monumental
+   hard-edged planes in vermilion / indigo / gold / black, no outlines, one
+   modular grid. See the direction contract in index.html.
+
+   Rule this file exists to enforce: no token is named after a hue it does not
+   hold. The old sheet shipped `--indigo: #E50914`, so "changing the indigo"
+   changed the brand red. Here the four plane colours keep their true names and
+   every UI role points at one of them. */
+
+:root {
+  color-scheme: light;
+
+  /* ---- the four planes + ground (never used directly by components; the
+     semantic roles below are the API) ---- */
+  --plane-vermilion: #e43d24;
+  --plane-indigo: #1e3a8a;
+  --plane-gold: #c8a24b;
+  --plane-black: #111111;
+  --paper: #f2e8d5;
+
+  /* Tints, for the rare surface that needs a plane at low weight (selected
+     rows, focus washes). Derived from the four above, never new hues. */
+  --plane-vermilion-wash: rgba(228, 61, 36, 0.12);
+  --plane-indigo-wash: rgba(30, 58, 138, 0.12);
+  --plane-gold-wash: rgba(200, 162, 75, 0.16);
+
+  /* ---- semantic roles: day scheme (the default — this is paper) ---- */
+  --bg: var(--paper);
+  --bg-sunk: #e8dcc4;        /* the ground one step back: wells, tracks, insets */
+  --surface: #f8f2e6;        /* a sheet laid on the paper */
+  --surface-raised: #fffdf7; /* a sheet floating above it */
+  --ink: var(--plane-black);
+  --ink-quiet: #57514a;      /* captions, secondary text — 7.0:1 on --bg */
+  --ink-faint: #7d746a;      /* the quietest legible step — 4.6:1 on --bg */
+  --rule: rgba(17, 17, 17, 0.14); /* hairlines. Tanaka has no outlines, so
+                                     rules divide space and never wrap shapes. */
+  --rule-strong: rgba(17, 17, 17, 0.3);
+
+  --accent: var(--plane-vermilion);
+  --accent-ink: #fffdf7;     /* text on an accent plane */
+  /* Ink for content sitting on the black plane specifically. --bg is NOT its
+     inverse at night (both are near-black), so badges/chips/marks that fill
+     with --plane-black and set color:var(--bg) went invisible — a black tick
+     on a #0d0d0d chip against a #131313 page. This is the one pairing that
+     needs its own token rather than reusing a ground colour. */
+  --on-plane-black: var(--paper);
+  --positive: var(--plane-indigo);
+  --negative: var(--plane-vermilion);
+  --notable: var(--plane-gold);
+
+  /* Paper texture. A washi tooth, not a gradient — two low-contrast dot grids
+     at odd offsets so no repeat is legible. Cheap: no image request, one
+     background declaration, no extra layer. */
+  --paper-texture:
+    radial-gradient(circle at 17% 31%, rgba(17, 17, 17, 0.022) 0.6px, transparent 0.7px),
+    radial-gradient(circle at 71% 83%, rgba(17, 17, 17, 0.018) 0.5px, transparent 0.6px);
+  --paper-texture-size: 13px 13px, 19px 19px;
+
+  /* ---- type ----
+     One family. Archivo: variable weight, true tabular figures, and a tight
+     heavy grotesk at the top end — the neo-grotesque register Tanaka set his
+     posters in. Display and caption are the same face at different weight and
+     tracking, which is how his posters work and how the phone stays fast. */
+  --font: Archivo, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Ramp. Display steps are fluid because a monumental plane needs a
+     monumental number beside it; text steps are fixed so body copy never
+     shifts. */
+  --fs-caption: 0.6875rem; /* 11px — tracked caps only, never sentences */
+  --fs-sm: 0.8125rem;      /* 13px — secondary */
+  --fs-base: 0.9375rem;    /* 15px — body, inputs */
+  --fs-lg: 1.0625rem;      /* 17px — lead, card titles */
+  --fs-xl: clamp(1.375rem, 1.1rem + 1.4vw, 1.75rem);   /* section heads */
+  --fs-2xl: clamp(1.875rem, 1.3rem + 2.9vw, 2.75rem);  /* page title */
+  --fs-display: clamp(2.75rem, 1.4rem + 6.8vw, 5.5rem); /* the score, the hero */
+
+  --lh-tight: 1.02; /* display only */
+  --lh-snug: 1.22;
+  --lh-body: 1.55;
+
+  --wt-regular: 400;
+  --wt-medium: 500;
+  --wt-semi: 600;
+  --wt-bold: 700;
+  --wt-black: 850; /* the heavy tight display weight */
+
+  --tracking-caps: 0.14em; /* the whisper-quiet caption */
+  --tracking-tight: -0.022em; /* display; Archivo needs pulling in when heavy */
+
+  /* ---- the module ----
+     Tanaka locks type and planes to one grid. Everything here is a multiple of
+     4px so type, planes and rules land on the same lines. */
+  --m: 4px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* Hard edges. Planes are cut, not rounded — the one exception is a control
+     that must read as pressable on a touch screen, which gets the smallest
+     radius that does the job and nothing more. */
+  --radius-none: 0px;
+  --radius-control: 2px;
+
+  --measure: 62ch;      /* readable line length */
+  --page: 1180px;       /* content max width */
+  --tap: 44px;          /* minimum touch target — WCAG, and this is a phone app */
+
+  /* Elevation is paper on paper: a tight contact shadow, never a glow. The old
+     sheet had four glows and a 90px-blur ambient layer; none of that survives. */
+  --lift-1: 0 1px 0 rgba(17, 17, 17, 0.06), 0 1px 2px rgba(17, 17, 17, 0.06);
+  --lift-2: 0 1px 0 rgba(17, 17, 17, 0.08), 0 6px 16px -6px rgba(17, 17, 17, 0.22);
+  --lift-3: 0 2px 0 rgba(17, 17, 17, 0.1), 0 18px 40px -14px rgba(17, 17, 17, 0.34);
+
+  /* ---- motion ----
+     One language: planes wipe along an axis, because a hard-edged plane has no
+     business fading. Nothing bounces. */
+  --dur-1: 90ms;
+  --dur-2: 180ms;
+  --dur-3: 320ms;
+  --dur-4: 620ms;  /* a plane landing */
+  --ease-plane: cubic-bezier(0.2, 0.85, 0.2, 1);  /* decisive, no overshoot */
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--plane-indigo);
+}
+
+/* ---- night scheme ----
+   The same four planes on black linen. Not "dark mode as a filter": the ground
+   changes material and the planes brighten just enough to hold their weight
+   against it, because a vermilion that reads on paper goes muddy on black.
+
+   The physical scene decided this: the phone is used at 11pm in bed and at 7am
+   in daylight, so both schemes are real and neither is a courtesy.
+
+   One block, keyed on one attribute. There used to be three — a
+   prefers-color-scheme media query plus a [data-theme='light'] and a
+   [data-theme='dark'] block duplicating every value — and the interplay between
+   the media query and the attribute left `body`'s colour resolved against the
+   wrong --ink, so the score and stat numbers rendered in cream on cream. The
+   theme hook now always writes a resolved data-theme (never "system"), and the
+   inline script in index.html sets it before first paint, so this attribute is
+   the single source of truth. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --plane-vermilion: #f0512f;
+  --plane-indigo: #4363c9;
+  --plane-gold: #d4ae5c;
+  --plane-black: #0d0d0d;
+  --paper: #eee5d2;
+
+  --plane-vermilion-wash: rgba(240, 81, 47, 0.16);
+  --plane-indigo-wash: rgba(67, 99, 201, 0.2);
+  --plane-gold-wash: rgba(212, 174, 92, 0.18);
+
+  --bg: #131313;
+  --bg-sunk: #0b0b0b;
+  --surface: #1b1b1a;
+  --surface-raised: #232322;
+  --ink: #f4efe4;
+  --ink-quiet: #b0a898;   /* 7.4:1 on --bg */
+  --ink-faint: #8b8377;   /* 4.7:1 on --bg */
+  --rule: rgba(244, 239, 228, 0.16);
+  --rule-strong: rgba(244, 239, 228, 0.32);
+
+  --accent-ink: #131313;
+
+  --paper-texture:
+    radial-gradient(circle at 17% 31%, rgba(244, 239, 228, 0.03) 0.6px, transparent 0.7px),
+    radial-gradient(circle at 71% 83%, rgba(244, 239, 228, 0.024) 0.5px, transparent 0.6px);
+
+  --lift-1: 0 1px 0 rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --lift-2: 0 1px 0 rgba(0, 0, 0, 0.5), 0 6px 16px -6px rgba(0, 0, 0, 0.7);
+  --lift-3: 0 2px 0 rgba(0, 0, 0, 0.55), 0 18px 40px -14px rgba(0, 0, 0, 0.8);
+}

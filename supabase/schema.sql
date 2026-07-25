@@ -388,6 +388,17 @@ end;
 $$;
 grant execute on function public.claim_orphaned_players(text) to authenticated;
 
+-- ===========================================================================
+-- V5: editable point target, everything-is-editable habits.
+-- The daily point ceiling used to be a fixed constant (30) baked into the
+-- client. It is now a per-room setting any member can adjust, and the three
+-- "shared" habits seeded on join are no longer special-cased against editing
+-- or removal — they're just regular rows with is_mandatory=true for display
+-- purposes (the "shared" badge), nothing in the database enforces they can't
+-- be changed.
+-- ===========================================================================
+alter table rooms add column if not exists point_target int not null default 30;
+
 -- Force PostgREST to reload its schema cache so new tables/columns are
 -- visible immediately, even when this file is run via the SQL Editor.
 notify pgrst, 'reload schema';
